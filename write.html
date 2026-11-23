@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Write Article - RK BlogSphere</title>
+<meta name="description" content="Write and share your stories on RK BlogSphere.">
+<link rel="stylesheet" href="style.css">
+<style>
+.page-container{
+max-width:900px;
+margin:40px auto;
+padding:20px;
+}
+.page-container form{
+display:grid;
+gap:15px;
+}
+.page-container input,
+.page-container textarea,
+.page-container select{
+width:100%;
+padding:14px;
+border-radius:12px;
+}
+.page-title{
+margin-bottom:20px;
+}
+.page-note{
+padding:15px;
+border-radius:12px;
+margin-bottom:20px;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+<a class="brand" href="index.html">
+<img src="rk-blogspheere-logo.png"
+alt="RK BlogSphere"
+class="rkb-logo-image rkb-header-logo">
+</a>
+
+<nav>
+<a href="index.html">Home</a>
+<a href="write.html">Write</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="about.html">About</a>
+<a href="contact.html">Contact</a>
+</nav>
+</header>
+
+<main class="page-container">
+
+<h1 class="page-title">Write Your Article</h1>
+
+<div class="page-note muted">
+Share your ideas, knowledge and stories with
+the RK BlogSphere community.
+</div>
+
+<div id="writePrompt" class="muted">
+Login and author permission will be required
+to submit an article.
+</div>
+
+<form id="postForm">
+
+<input id="postTitle"
+type="text"
+placeholder="Article title"
+required>
+
+<input id="postExcerpt"
+type="text"
+placeholder="Short description">
+
+<select id="postCategory">
+<option value="">Choose category</option>
+</select>
+
+<textarea id="postContent"
+rows="12"
+placeholder="Write your article here..."
+required></textarea>
+
+<label>
+Cover image (optional)
+<input id="coverFile"
+type="file"
+accept="image/*">
+</label>
+
+<button class="btn" type="submit">
+Submit Article
+</button>
+
+<p id="postMessage" aria-live="polite"></p>
+
+</form>
+
+</main>
+
+<footer>
+<p>© <span id="year"></span> RK BlogSphere</p>
+</footer>
+
+<div id="modal" class="modal" hidden>
+<div class="modalcard">
+<button id="closeModal" class="close">×</button>
+
+<div class="rkb-logo-frame">
+<img src="rk-blogspheere-logo.png"
+class="rkb-logo-image rkb-auth-logo"
+alt="RK BlogSphere">
+</div>
+
+<div id="modalContent"></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+</body>
+</html>
