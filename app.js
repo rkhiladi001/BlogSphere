@@ -64,28 +64,29 @@
 
   // MODAL
   function showModal(content) {
-    const modal = $('modal');
-    if (!modal) return;
+  const modal = $('modal');
+  if (!modal) return;
 
-    modal.innerHTML = `
-      <div class="modal-overlay" data-close-modal>
-        <div class="modal-content" onclick="event.stopPropagation()">
-          ${content}
-        </div>
+  modal.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-content">
+        ${content}
       </div>
-    `;
+    </div>
+  `;
 
-    modal.hidden = false;
+  modal.hidden = false;
+
+  const overlay = modal.querySelector('.modal-overlay');
+
+  overlay?.addEventListener('click', event => {
+    if (event.target === overlay) closeModal();
+  });
+
+  modal.querySelectorAll('[data-close-modal]').forEach(button => {
+    button.addEventListener('click', closeModal);
+  });
   }
-
-  function closeModal() {
-    const modal = $('modal');
-    if (!modal) return;
-
-    modal.hidden = true;
-    modal.innerHTML = '';
-  }
-
   // DATE FORMAT
   function formatDate(date) {
     if (!date) return '';
