@@ -81,3 +81,64 @@
   min-height: 20px;
   font-weight: 600;
 }
+/* RK BlogSphere - Premium Header Design */
+
+body > header,
+.site-header,
+#siteHeader,
+.main-header {
+  background: linear-gradient(
+    110deg,
+    #10105c 0%,
+    #2820a0 48%,
+    #7025bd 100%
+  ) !important;
+
+  color: #ffffff !important;
+  border-bottom: 3px solid #ffbd35 !important;
+  box-shadow: 0 5px 22px rgba(20, 10, 90, 0.25) !important;
+}
+
+/* Header navigation links */
+body > header a,
+.site-header a,
+#siteHeader a,
+.main-header a {
+  color: #ffffff !important;
+  transition: 0.25s ease;
+}
+
+body > header a:hover,
+.site-header a:hover,
+#siteHeader a:hover,
+.main-header a:hover {
+  color: #ffd34d !important;
+}
+
+/* Header buttons */
+body > header button,
+.site-header button,
+#siteHeader button,
+.main-header button {
+  border: 1px solid #ffffff !important;
+  border-radius: 10px !important;
+  transition: 0.25s ease;
+}
+
+body > header button:hover,
+.site-header button:hover,
+#siteHeader button:hover,
+.main-header button:hover {
+  background: #ffbd35 !important;
+  color: #17105c !important;
+}
+
+/* Mobile header */
+@media (max-width: 600px) {
+  body > header,
+  .site-header,
+  #siteHeader,
+  .main-header {
+    padding: 12px !important;
+  }
+}
