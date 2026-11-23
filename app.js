@@ -1,18 +1,20 @@
+
 (() => {
   const cfg = window.BLOGSPHERE_CONFIG || {};
+  const $ = id => document.getElementById(id);
+
+  if ($('year')) $('year').textContent = new Date().getFullYear();
+
   const missing =
     !cfg.SUPABASE_URL ||
     !cfg.SUPABASE_ANON_KEY ||
     cfg.SUPABASE_URL.includes('PASTE_') ||
     cfg.SUPABASE_ANON_KEY.includes('PASTE_');
 
-  const $ = id => document.getElementById(id);
-
-  $('year').textContent = new Date().getFullYear();
-
   if (missing || !window.supabase) {
-    $('feedStatus').textContent = 'Setup required: add Supabase URL and anon key in config.js';
-    $('posts').innerHTML = '<div class="message">Add your Supabase URL and anon/public key in config.js.</div>';
+    if ($('feedStatus')) $('feedStatus').textContent = 'Setup required';
+    if ($('posts')) $('posts').innerHTML =
+      '<div class="message">Supabase setup required in config.js.</div>';
     return;
   }
 
@@ -21,7 +23,11 @@
     cfg.SUPABASE_ANON_KEY
   );
 
-  let session = null, profile = null, categories = [], posts = [];
+  let session = null;
+  let profile = null;
+  let categories = [];
+  let posts = [];
+  let settings = {};
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
     '&':'&amp;',
@@ -37,16 +43,164 @@
   const isAdmin = () =>
     profile && ['editor','admin','super_admin'].includes(profile.role);
 
-  const modal = html => {
+  const isSuperAdmin = () =>
+    profile && profile.role === 'super_admin';
+
+  function setting(key, fallback='') {
+    const v = settings[key];
+    if (v === undefined || v === null || v === '') return fallback;
+    return String(v);
+  }
+
+  function modal(html) {
     $('modalContent').innerHTML = html;
     $('modal').hidden = false;
-  };
+  }
 
   $('closeModal').onclick = () => $('modal').hidden = true;
 
   $('modal').addEventListener('click', e => {
     if (e.target === $('modal')) $('modal').hidden = true;
   });
+
+  // =========================
+  // SITE SETTINGS
+  // =========================
+
+  async function loadSettings() {
+    const {data,error} = await db
+      .from('site_settings')
+      .select('key,value');
+
+    if (error) {
+      console.warn('Settings:',error.message);
+      return;
+    }
+
+    settings = {};
+
+    (data || []).forEach(row => {
+      let v = row.value;
+
+      if (typeof v === 'string') {
+        try {
+          const parsed = JSON.parse(v);
+          if (typeof parsed === 'string') v = parsed;
+        } catch (_) {}
+      }
+
+      settings[row.key] = v;
+    });
+
+    applySettings();
+  }
+
+  function applySettings() {
+    const siteName = setting('site_name','RK BlogSphere');
+    const tagline = setting('site_tagline','CREATE · SHARE · INSPIRE');
+    const heroTitle = setting('hero_title','Ideas worth sharing.');
+    const heroDescription = setting(
+      'hero_description',
+      'Discover stories and perspectives from the BlogSphere community.'
+    );
+
+    document.title = siteName;
+
+    const header = document.querySelector('.topbar .brand');
+    if (header) {
+      const img = header.querySelector('img');
+      if (img && setting('logo_header')) {
+        img.src = setting('logo_header');
+        img.style.display = 'block';
+        if (img.nextElementSibling) img.nextElementSibling.style.display='none';
+      } else if (img) {
+        img.src = 'rk-blogspheere-logo.png';
+      }
+    }
+
+    const heroLogo = document.querySelector('.rkb-hero-logo');
+    if (heroLogo) {
+      heroLogo.src = setting('logo_home','rk-blogspheere-logo.png');
+      heroLogo.style.display = 'block';
+    }
+
+    const footerLogo = document.querySelector('.rkb-footer-logo');
+    if (footerLogo) {
+      footerLogo.src = setting('logo_footer','rk-blogspheere-logo.png');
+      footerLogo.style.display = 'block';
+    }
+
+    const authLogo = document.querySelector('.rkb-auth-logo');
+    if (authLogo) {
+      authLogo.src = setting('logo_login','rk-blogspheere-logo.png');
+    }
+
+    const adminLogo = document.querySelector('.rkb-admin-logo');
+    if (adminLogo) {
+      adminLogo.src = setting('logo_admin','rk-blogspheere-logo.png');
+    }
+
+    const hero = document.querySelector('.hero h1');
+    if (hero) {
+      const parts = heroTitle.split(' ');
+      hero.innerHTML = esc(parts.join(' '));
+    }
+
+    const heroPara = document.querySelector('.hero > div > p:not(.eyebrow)');
+    if (heroPara) heroPara.textContent = heroDescription;
+
+    const eyebrow = document.querySelector('.hero .eyebrow');
+    if (eyebrow) eyebrow.textContent = tagline;
+
+    const fallback = document.querySelector('.rkb-brand-fallback span:last-child');
+    if (fallback) fallback.textContent = siteName;
+  }
+
+  async function saveSetting(key,value) {
+    const {data,error} = await db.rpc('admin_set_site_setting',{
+      p_key:key,
+      p_value:value
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    settings[key] = value;
+    applySettings();
+    return data;
+  }
+
+  async function uploadLogo(file,key) {
+    if (!file) throw new Error('Please select an image.');
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Only image files are allowed.');
+    }
+
+    if (file.size > 5*1024*1024) {
+      throw new Error('Image must be smaller than 5 MB.');
+    }
+
+    const path =
+      `site-logos/${key}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+
+    const {error} = await db.storage
+      .from('blog-images')
+      .upload(path,file,{upsert:false});
+
+    if (error) throw error;
+
+    const {data} = db.storage
+      .from('blog-images')
+      .getPublicUrl(path);
+
+    return data.publicUrl;
+  }
+
+  // =========================
+  // CATEGORIES
+  // =========================
 
   async function loadCategories() {
     const {data,error} = await db
@@ -74,6 +228,10 @@
       ).join('');
   }
 
+  // =========================
+  // AUTH
+  // =========================
+
   async function loadProfile() {
     profile = null;
 
@@ -88,8 +246,8 @@
     }
 
     renderAuth();
-    renderDashboard();
     renderWrite();
+    await renderDashboard();
   }
 
   function renderAuth() {
@@ -97,74 +255,82 @@
       $('authArea').innerHTML =
         `<span class="postmeta">${
           esc(profile?.username || profile?.full_name || session.user.email)
-        }${profile?.role ? ` · ${esc(profile.role)}` : ''}</span>
+        }${profile?.role ? ' · '+esc(profile.role) : ''}</span>
         <button class="smallbtn" id="logoutBtn">Logout</button>`;
 
       $('logoutBtn').onclick = async () => {
         await db.auth.signOut();
       };
-    } else {
-      $('authArea').innerHTML =
-        '<button class="btn" id="loginBtn">Login / Sign up</button>';
+
+      return;
     }
 
-    const loginBtn = $('loginBtn');
-    if (!loginBtn) return;
+    $('authArea').innerHTML =
+      '<button class="btn" id="loginBtn">Login / Sign up</button>';
 
-    loginBtn.onclick = () => modal(`
-      <h2>Login / Sign up</h2>
-      <form id="authForm" class="adminlist">
-        <input id="authEmail" type="email" required placeholder="Email">
-        <input id="authPassword" type="password" minlength="6" required placeholder="Password (min 6 characters)">
-        <div class="inlineform">
-          <button class="btn" type="submit">Login</button>
-          <button class="btn secondary" id="signupBtn" type="button">Create account</button>
-        </div>
-        <p id="authMsg" class="muted"></p>
-      </form>
-    `);
+    $('loginBtn').onclick = () => {
+      modal(`
+        <h2>Login / Sign up</h2>
+        <form id="authForm" class="adminlist">
+          <input id="authEmail" type="email" required placeholder="Email">
+          <input id="authPassword" type="password" minlength="6" required placeholder="Password (min 6 characters)">
+          <div class="inlineform">
+            <button class="btn" type="submit">Login</button>
+            <button class="btn secondary" id="signupBtn" type="button">Create account</button>
+          </div>
+          <p id="authMsg" class="muted"></p>
+        </form>
+      `);
 
-    $('modalContent').addEventListener('submit', async e => {
-      if (e.target.id !== 'authForm') return;
-      e.preventDefault();
+      $('authForm').onsubmit = async e => {
+        e.preventDefault();
 
-      const email = $('authEmail').value;
-      const password = $('authPassword').value;
+        const email = $('authEmail').value;
+        const password = $('authPassword').value;
 
-      const {error} = await db.auth.signInWithPassword({email,password});
+        const {error} = await db.auth.signInWithPassword({
+          email,password
+        });
 
-      $('authMsg').textContent = error?.message || 'Logged in';
+        $('authMsg').textContent = error?.message || 'Login successful';
 
-      if (!error) $('modal').hidden = true;
-    }, {once:true});
+        if (!error) $('modal').hidden = true;
+      };
 
-    const signup = $('signupBtn');
+      $('signupBtn').onclick = async () => {
+        const email = $('authEmail').value;
+        const password = $('authPassword').value;
 
-    if (signup) signup.onclick = async () => {
-      const email = $('authEmail').value;
-      const password = $('authPassword').value;
+        if (!email || password.length < 6) {
+          $('authMsg').textContent =
+            'Enter email and password (at least 6 characters).';
+          return;
+        }
 
-      if (!email || password.length < 6) {
-        $('authMsg').textContent = 'Enter email and password (at least 6 characters).';
-        return;
-      }
+        const {error} = await db.auth.signUp({email,password});
 
-      const {error} = await db.auth.signUp({email,password});
-
-      $('authMsg').textContent =
-        error?.message || 'Signup submitted. Check your email if confirmation is required.';
+        $('authMsg').textContent =
+          error?.message ||
+          'Signup submitted. Check your email if confirmation is required.';
+      };
     };
   }
 
   function renderWrite() {
     const eligible = canWrite();
+
     $('writePrompt').hidden = eligible;
     $('postForm').hidden = !eligible;
   }
 
+  // =========================
+  // DASHBOARD
+  // =========================
+
   async function renderDashboard() {
     if (!session?.user) {
-      $('dashboardContent').textContent = 'Sign in to view your dashboard.';
+      $('dashboardContent').textContent =
+        'Sign in to view your dashboard.';
       return;
     }
 
@@ -177,6 +343,9 @@
 
     if (isAdmin()) {
       html += `
+        <hr>
+        <h2>Website Branding Settings</h2>
+        <div id="brandingPanel"></div>
         <hr>
         <h3>Moderation queue</h3>
         <div id="moderation" class="adminlist">Loading…</div>
@@ -195,25 +364,29 @@
 
     $('dashboardContent').innerHTML = html;
 
-    const {data:mine} = await db
+    const {data:mine,error:mineError} = await db
       .from('posts')
       .select('id,title,status,created_at')
       .eq('author_id',session.user.id)
       .order('created_at',{ascending:false});
 
-    $('myPosts').innerHTML = (mine || []).length
-      ? (mine || []).map(p => `
-          <div class="adminrow">
-            <div>
-              <b>${esc(p.title)}</b>
-              <div class="postmeta">
-                ${esc(p.status)} · ${new Date(p.created_at).toLocaleDateString()}
+    if (mineError) {
+      $('myPosts').textContent = mineError.message;
+    } else {
+      $('myPosts').innerHTML = (mine || []).length
+        ? mine.map(p => `
+            <div class="adminrow">
+              <div>
+                <b>${esc(p.title)}</b>
+                <div class="postmeta">
+                  ${esc(p.status)} · ${new Date(p.created_at).toLocaleDateString()}
+                </div>
               </div>
+              <button class="smallbtn" data-own="${p.id}">View</button>
             </div>
-            <button class="smallbtn" data-own="${p.id}">View</button>
-          </div>
-        `).join('')
-      : 'No articles yet.';
+          `).join('')
+        : 'No articles yet.';
+    }
 
     $('myPosts').querySelectorAll('[data-own]').forEach(b => {
       b.onclick = () => openPost(b.dataset.own);
@@ -222,10 +395,114 @@
     if (isAdmin()) await loadAdmin();
   }
 
+  // =========================
+  // ADMIN BRANDING PANEL
+  // =========================
+
+  function renderBrandingPanel() {
+    if (!isAdmin() || !$('brandingPanel')) return;
+
+    const logoFields = [
+      ['logo_header','Header Logo'],
+      ['logo_home','Home Logo'],
+      ['logo_login','Login Logo'],
+      ['logo_admin','Admin Logo'],
+      ['logo_footer','Footer Logo']
+    ];
+
+    $('brandingPanel').innerHTML = `
+      <div class="adminlist">
+        <label>Website Name</label>
+        <input id="settingSiteName" value="${esc(setting('site_name','RK BlogSphere'))}">
+        <label>Website Tagline</label>
+        <input id="settingTagline" value="${esc(setting('site_tagline','CREATE · SHARE · INSPIRE'))}">
+        <label>Homepage Heading</label>
+        <input id="settingHeroTitle" value="${esc(setting('hero_title','Ideas worth sharing.'))}">
+        <label>Homepage Description</label>
+        <textarea id="settingHeroDescription" rows="3">${esc(setting('hero_description','Discover stories and perspectives from the BlogSphere community.'))}</textarea>
+
+        <hr>
+        <h3>Logo Upload / Change</h3>
+        <p class="postmeta">Upload image files up to 5 MB. Images will be stored in the blog-images bucket.</p>
+
+        ${logoFields.map(([key,label]) => `
+          <div class="adminrow" style="display:block">
+            <b>${esc(label)}</b>
+            <div>
+              <img
+                src="${esc(setting(key,'rk-blogspheere-logo.png'))}"
+                alt="${esc(label)}"
+                style="max-width:220px;max-height:100px;object-fit:contain;margin:10px 0"
+                onerror="this.style.display='none'"
+              >
+            </div>
+            <input type="file" id="file_${key}" accept="image/*">
+            <button class="smallbtn" data-upload-logo="${key}">Upload / Change</button>
+          </div>
+        `).join('')}
+
+        <button class="btn" id="saveSiteSettings">Save Website Settings</button>
+        <p id="brandingMessage"></p>
+      </div>
+    `;
+
+    $('saveSiteSettings').onclick = async () => {
+      const values = {
+        site_name:$('settingSiteName').value.trim(),
+        site_tagline:$('settingTagline').value.trim(),
+        hero_title:$('settingHeroTitle').value.trim(),
+        hero_description:$('settingHeroDescription').value.trim()
+      };
+
+      const msg = $('brandingMessage');
+      msg.textContent = 'Saving…';
+
+      try {
+        for (const [key,value] of Object.entries(values)) {
+          await saveSetting(key,value);
+        }
+
+        msg.textContent = 'Website settings saved successfully.';
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    };
+
+    $('brandingPanel').querySelectorAll('[data-upload-logo]').forEach(b => {
+      b.onclick = async () => {
+        const key = b.dataset.uploadLogo;
+        const file = $('file_'+key).files[0];
+
+        if (!file) {
+          $('brandingMessage').textContent = 'Select a logo file first.';
+          return;
+        }
+
+        $('brandingMessage').textContent = 'Uploading…';
+
+        try {
+          const url = await uploadLogo(file,key);
+          await saveSetting(key,url);
+          $('brandingMessage').textContent =
+            'Logo uploaded and setting saved successfully.';
+          renderBrandingPanel();
+        } catch (e) {
+          $('brandingMessage').textContent = e.message;
+        }
+      };
+    });
+  }
+
+  // =========================
+  // ADMIN
+  // =========================
+
   async function loadAdmin() {
+    renderBrandingPanel();
+
     const {data:queue,error} = await db
       .from('posts')
-      .select('id,title,status,author_id')
+      .select('id,title,status,author_id,created_at')
       .neq('status','published')
       .order('created_at',{ascending:false});
 
@@ -280,42 +557,54 @@
       }
     };
 
-    const {data:users,error:ue} = await db
+    await loadUsers();
+  }
+
+  // =========================
+  // SECURE USER ROLE MANAGEMENT
+  // =========================
+
+  async function loadUsers() {
+    const {data:users,error} = await db
       .from('profiles')
-      .select('id,email,username,role')
+      .select('id,email,username,role,created_at')
       .order('created_at',{ascending:false})
       .limit(100);
 
-    if (ue) {
-      $('usersList').textContent = ue.message;
+    if (error) {
+      $('usersList').textContent = error.message;
       return;
     }
 
-    $('usersList').innerHTML = (users || []).map(u => `
-      <div class="adminrow">
-        <div>
-          <b>${esc(u.email || u.username || u.id)}</b>
-          <div class="postmeta">${esc(u.role)}</div>
+    $('usersList').innerHTML = (users || []).map(u => {
+      const allowed = isSuperAdmin()
+        ? ['user','author','editor','admin','super_admin']
+        : ['user','author'];
+
+      return `
+        <div class="adminrow">
+          <div>
+            <b>${esc(u.email || u.username || u.id)}</b>
+            <div class="postmeta">${esc(u.role)}</div>
+          </div>
+          <select data-role="${u.id}" ${u.id===session.user.id?'disabled':''}>
+            ${allowed.map(r =>
+              `<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`
+            ).join('')}
+          </select>
         </div>
-        <select data-role="${u.id}">
-          <option value="user" ${u.role==='user'?'selected':''}>user</option>
-          <option value="author" ${u.role==='author'?'selected':''}>author</option>
-          <option value="editor" ${u.role==='editor'?'selected':''}>editor</option>
-          <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
-          <option value="super_admin" ${u.role==='super_admin'?'selected':''}>super_admin</option>
-        </select>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     $('usersList').querySelectorAll('[data-role]').forEach(sel => {
       sel.onchange = async () => {
-        const {error} = await db
-          .from('profiles')
-          .update({role:sel.value})
-          .eq('id',sel.dataset.role);
+        const {error} = await db.rpc('admin_set_user_role',{
+          p_user_id:sel.dataset.role,
+          p_role:sel.value
+        });
 
         if (error) {
-          alert('Role update failed: ' + error.message);
+          alert('Role update failed: '+error.message);
           await renderDashboard();
         } else {
           alert('Role updated.');
@@ -325,7 +614,10 @@
     });
   }
 
-  // Publish or reject a post using the database moderation function.
+  // =========================
+  // MODERATION
+  // =========================
+
   async function moderate(id,status) {
     const {data,error} = await db.rpc('admin_moderate_post',{
       p_post_id:id,
@@ -333,45 +625,45 @@
     });
 
     if (error) {
-      alert('Moderation failed: ' + error.message);
+      alert('Moderation failed: '+error.message);
       return;
     }
 
     alert(data || 'Post status updated.');
-
     await loadPosts();
     await renderDashboard();
   }
 
-  // Delete a post using the database delete function.
   async function deletePost(id) {
-    if (!confirm('Are you sure you want to permanently delete this post?')) return;
+    if (!confirm('Delete this article permanently?')) return;
 
     const {data,error} = await db.rpc('admin_delete_post',{
       p_post_id:id
     });
 
     if (error) {
-      alert('Delete failed: ' + error.message);
+      alert('Delete failed: '+error.message);
       return;
     }
 
     alert(data || 'Post deleted.');
-
     await loadPosts();
     await renderDashboard();
   }
 
+  // =========================
+  // POSTS
+  // =========================
+
   async function loadPosts() {
     $('feedStatus').textContent = 'Loading…';
 
-    let q = db.from('posts')
+    const {data,error} = await db
+      .from('posts')
       .select('id,title,slug,excerpt,content,cover_image,category_id,status,featured,views,created_at,published_at,author_id')
       .eq('status','published')
       .order('featured',{ascending:false})
       .order('published_at',{ascending:false});
-
-    const {data,error} = await q;
 
     if (error) {
       $('feedStatus').textContent = error.message;
@@ -385,7 +677,11 @@
     let catMap = {};
 
     if (ids.length) {
-      const {data:c} = await db.from('categories').select('id,name').in('id',ids);
+      const {data:c} = await db
+        .from('categories')
+        .select('id,name')
+        .in('id',ids);
+
       (c || []).forEach(x => catMap[x.id] = x.name);
     }
 
@@ -394,8 +690,8 @@
 
     const filtered = posts.filter(p =>
       (!cat || p.category_id === cat) &&
-      (!query || `${p.title} ${p.excerpt || ''} ${p.content || ''}`.toLowerCase().includes(query)
-      )
+      (!query || `${p.title} ${p.excerpt || ''} ${p.content || ''}`
+        .toLowerCase().includes(query))
     );
 
     $('feedStatus').textContent = `${filtered.length} article(s)`;
@@ -407,187 +703,4 @@
               ? `<img src="${esc(p.cover_image)}" alt="" loading="lazy">`
               : `<div style="height:190px;background:#dce5e1;display:grid;place-items:center;font-size:2rem;color:#146c60">✦</div>`
             }
-            <div class="postbody">
-              <span class="tag">${esc(catMap[p.category_id] || 'Article')}${p.featured ? ' · FEATURED' : ''}</span>
-              <h3>${esc(p.title)}</h3>
-              <p>${esc(p.excerpt || '')}</p>
-              <span class="postmeta">
-                ${new Date(p.published_at || p.created_at).toLocaleDateString()} · ${p.views || 0} views
-              </span>
-              <div class="postactions">
-                <button data-read="${p.id}">Read article</button>
-                ${session ? `<button data-save="${p.id}">Bookmark</button><button data-like="${p.id}">Like</button>` : ''}
-              </div>
-            </div>
-          </article>
-        `).join('')
-      : '<div class="message">No articles found yet. Once published, articles will appear here.</div>';
-
-    $('posts').querySelectorAll('[data-read]').forEach(b => {
-      b.onclick = () => openPost(b.dataset.read);
-    });
-
-    $('posts').querySelectorAll('[data-save]').forEach(b => {
-      b.onclick = () => bookmark(b.dataset.save);
-    });
-
-    $('posts').querySelectorAll('[data-like]').forEach(b => {
-      b.onclick = () => like(b.dataset.like);
-    });
-  }
-
-  async function openPost(id) {
-    const p = posts.find(x => x.id === id);
-    if (!p) return;
-
-    await db.rpc('increment_post_view',{post_id_input:id}).catch(() => {});
-
-    const {data:comments} = await db
-      .from('comments')
-      .select('content,author_id,created_at')
-      .eq('post_id',id)
-      .eq('status','approved')
-      .order('created_at');
-
-    modal(`
-      <h2>${esc(p.title)}</h2>
-      ${p.cover_image ? `<img style="width:100%;border-radius:12px" src="${esc(p.cover_image)}">` : ''}
-      <p class="postmeta">${new Date(p.published_at || p.created_at).toLocaleDateString()}</p>
-      <div class="articlecontent">${esc(p.content)}</div>
-      <hr>
-      <h3>Comments</h3>
-      <div>
-        ${(comments || []).map(c => `
-          <p>${esc(c.content)}
-          <small class="postmeta">${new Date(c.created_at).toLocaleDateString()}</small></p>
-        `).join('') || 'No comments yet.'}
-      </div>
-      ${session ? `
-        <form id="commentForm">
-          <textarea id="commentText" rows="3" placeholder="Add a comment…" required></textarea>
-          <button class="btn" type="submit">Submit comment</button>
-          <p class="postmeta">Comments may require moderation.</p>
-        </form>
-      ` : '<p class="postmeta">Sign in to comment.</p>'}
-    `);
-
-    if ($('commentForm')) {
-      $('commentForm').onsubmit = async e => {
-        e.preventDefault();
-
-        const {error} = await db.from('comments').insert({
-          post_id:id,
-          author_id:session.user.id,
-          content:$('commentText').value.trim(),
-          status:'pending'
-        });
-
-        alert(error?.message || 'Comment submitted for review.');
-
-        if (!error) $('modal').hidden = true;
-      };
-    }
-  }
-
-  async function bookmark(id) {
-    const {error} = await db.from('bookmarks').insert({
-      post_id:id,
-      user_id:session.user.id
-    });
-
-    alert(error?.message || 'Saved to bookmarks.');
-  }
-
-  async function like(id) {
-    const {error} = await db.from('likes').insert({
-      post_id:id,
-      user_id:session.user.id
-    });
-
-    alert(error?.message || 'Liked.');
-  }
-
-  $('postForm').onsubmit = async e => {
-    e.preventDefault();
-
-    if (!canWrite()) {
-      $('postMessage').textContent = 'Author permission required.';
-      return;
-    }
-
-    const title = $('postTitle').value.trim();
-    const content = $('postContent').value.trim();
-    const category_id = $('postCategory').value;
-
-    let cover_image = null;
-    const file = $('coverFile').files[0];
-
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        $('postMessage').textContent = 'Image must be smaller than 5 MB.';
-        return;
-      }
-
-      const path =
-        `${session.user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
-
-      const {error:up} = await db.storage
-        .from('blog-images')
-        .upload(path,file,{upsert:false});
-
-      if (up) {
-        $('postMessage').textContent = up.message;
-        return;
-      }
-
-      const {data:url} = db.storage.from('blog-images').getPublicUrl(path);
-      cover_image = url.publicUrl;
-    }
-
-    const slug =
-      title.toLowerCase()
-        .replace(/[^a-z0-9]+/g,'-')
-        .replace(/(^-|-$)/g,'') +
-      '-' +
-      Date.now().toString().slice(-5);
-
-    const {error} = await db.from('posts').insert({
-      author_id:session.user.id,
-      title,
-      slug,
-      excerpt:$('postExcerpt').value.trim(),
-      content,
-      cover_image,
-      category_id:category_id || null,
-      status:'pending'
-    });
-
-    $('postMessage').textContent =
-      error?.message || 'Article submitted for moderation.';
-
-    if (!error) {
-      e.target.reset();
-      await renderDashboard();
-    }
-  };
-
-  $('search').oninput = loadPosts;
-  $('categoryFilter').onchange = loadPosts;
-  $('refreshBtn').onclick = loadPosts;
-
-  db.auth.onAuthStateChange((_event,s) => {
-    session = s;
-    setTimeout(async () => {
-      await loadProfile();
-      await loadPosts();
-    },0);
-  });
-
-  (async () => {
-    const {data} = await db.auth.getSession();
-    session = data.session;
-    await loadCategories();
-    await loadProfile();
-    await loadPosts();
-  })();
-})();
+            <div 
