@@ -1,0 +1,80 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard - RK BlogSphere</title>
+<meta name="description" content="RK BlogSphere account and author dashboard.">
+<link rel="stylesheet" href="style.css">
+<style>
+.dashboard-page{
+max-width:1100px;
+margin:40px auto;
+padding:20px;
+}
+.dashboard-panel{
+padding:20px;
+border-radius:18px;
+}
+.dashboard-heading{
+margin-bottom:25px;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+<a class="brand" href="index.html">
+<img src="rk-blogspheere-logo.png"
+alt="RK BlogSphere"
+class="rkb-logo-image rkb-header-logo">
+</a>
+
+<nav>
+<a href="index.html">Home</a>
+<a href="write.html">Write</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="about.html">About</a>
+<a href="contact.html">Contact</a>
+</nav>
+
+<div id="authArea"></div>
+</header>
+
+<main class="dashboard-page">
+
+<div class="sectionhead dashboard-heading">
+<h1>Dashboard</h1>
+<span>Account & Administration</span>
+</div>
+
+<div id="dashboardContent" class="dashboard-panel">
+Sign in to view your dashboard.
+</div>
+
+</main>
+
+<footer>
+<p>© <span id="year"></span> RK BlogSphere</p>
+</footer>
+
+<div id="modal" class="modal" hidden>
+<div class="modalcard">
+<button id="closeModal" class="close">×</button>
+
+<div class="rkb-logo-frame">
+<img src="rk-blogspheere-logo.png"
+class="rkb-logo-image rkb-auth-logo"
+alt="RK BlogSphere">
+</div>
+
+<div id="modalContent"></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+</body>
+</html>
