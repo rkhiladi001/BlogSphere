@@ -270,3 +270,126 @@ footer .footer-bottom,
   }
 }
 
+/* RK BlogSphere - Compact Premium Footer */
+
+footer,
+.site-footer,
+#siteFooter,
+.main-footer {
+  background: linear-gradient(
+    120deg,
+    #172554 0%,
+    #263b78 50%,
+    #433078 100%
+  ) !important;
+
+  color: #ffffff !important;
+  padding: 22px 16px 12px !important;
+  margin-top: 25px !important;
+  border-top: 3px solid #f5c451 !important;
+  box-shadow: 0 -4px 16px rgba(20, 30, 70, 0.15) !important;
+}
+
+/* Footer Logo */
+footer img,
+.site-footer img,
+#siteFooter img,
+.main-footer img {
+  max-width: 145px !important;
+  max-height: 48px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  background: #ffffff !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Footer headings */
+footer h1,
+footer h2,
+footer h3,
+.site-footer h2,
+.site-footer h3 {
+  color: #ffe08a !important;
+  font-size: 17px !important;
+  margin: 0 0 9px !important;
+}
+
+/* Footer text */
+footer p,
+footer span,
+footer li,
+.site-footer p,
+.site-footer li {
+  color: #f1f3ff !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
+/* Footer links */
+footer a,
+.site-footer a,
+#siteFooter a {
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+
+footer a:hover,
+.site-footer a:hover {
+  color: #ffe08a !important;
+}
+
+/* Footer newsletter */
+footer input,
+.site-footer input {
+  max-width: 100% !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #c9d4ff !important;
+  box-sizing: border-box !important;
+}
+
+footer button,
+.site-footer button {
+  padding: 10px 16px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #ffe08a, #ffbd59) !important;
+  color: #26305c !important;
+  font-weight: 800 !important;
+}
+
+/* Footer bottom */
+footer .footer-bottom,
+.site-footer .footer-bottom {
+  margin-top: 12px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid rgba(255,255,255,0.25) !important;
+  text-align: center !important;
+}
+
+/* Compact mobile footer */
+@media (max-width: 600px) {
+  footer,
+  .site-footer,
+  #siteFooter,
+  .main-footer {
+    padding: 18px 12px 10px !important;
+  }
+
+  footer img,
+  .site-footer img {
+    max-width: 125px !important;
+    max-height: 42px !important;
+  }
+
+  footer p,
+  footer li {
+    font-size: 13px !important;
+  }
+}
+
+
