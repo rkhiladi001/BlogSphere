@@ -2,3 +2,82 @@
 .modal[hidden] {
   display: none !important;
 }
+/* RK BlogSphere - Premium Newsletter Design */
+
+.newsletter-section {
+  width: 100%;
+  padding: 45px 20px;
+  margin: 30px auto;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #17104b, #4020a0, #087fbd);
+  color: #ffffff;
+  text-align: center;
+  border-radius: 18px;
+}
+
+.newsletter-inner {
+  max-width: 650px;
+  margin: auto;
+}
+
+.newsletter-inner h2 {
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+
+.newsletter-inner p {
+  color: #e9eaff;
+  font-size: 15px;
+  margin: 10px 0 20px;
+}
+
+#rkNewsletterForm {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#rkNewsletterEmail {
+  flex: 1;
+  min-width: 190px;
+  padding: 15px 16px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  outline: none;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+#rkNewsletterEmail:focus {
+  border-color: #ffd54a;
+}
+
+#rkNewsletterForm button {
+  padding: 15px 25px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffcc33, #ff7b24);
+  color: #20134c;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+#rkNewsletterForm button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px #0004;
+}
+
+#rkNewsletterForm button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#rkNewsletterMessage {
+  min-height: 20px;
+  font-weight: 600;
+}
