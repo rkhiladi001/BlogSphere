@@ -142,3 +142,37 @@ body > header button:hover,
     padding: 12px !important;
   }
 }
+
+/* RK BlogSphere - Clear Header Logo */
+
+.site-header img,
+#siteHeader img,
+.main-header img,
+body > header img {
+  width: 170px !important;
+  height: 58px !important;
+  max-width: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+
+  background: #ffffff !important;
+  padding: 5px 12px !important;
+  border-radius: 12px !important;
+
+  box-sizing: border-box !important;
+  opacity: 1 !important;
+  filter: none !important;
+
+  box-shadow: 0 3px 12px rgba(0,0,0,0.20) !important;
+}
+
+@media (max-width: 600px) {
+  .site-header img,
+  #siteHeader img,
+  .main-header img,
+  body > header img {
+    width: 135px !important;
+    height: 48px !important;
+  }
+}
+
