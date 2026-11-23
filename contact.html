@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contact - RK BlogSphere</title>
+<meta name="description" content="Contact RK BlogSphere.">
+<link rel="stylesheet" href="style.css">
+<style>
+.contact-container{
+max-width:800px;
+margin:40px auto;
+padding:25px;
+}
+.contact-card{
+padding:25px;
+border-radius:20px;
+}
+.contact-card p{
+line-height:1.8;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+<a class="brand" href="index.html">
+<img src="rk-blogspheere-logo.png"
+alt="RK BlogSphere"
+class="rkb-logo-image rkb-header-logo">
+</a>
+
+<nav>
+<a href="index.html">Home</a>
+<a href="write.html">Write</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="about.html">About</a>
+<a href="contact.html">Contact</a>
+</nav>
+</header>
+
+<main class="contact-container">
+
+<div class="contact-card">
+<h1>Contact Us</h1>
+
+<p>
+Have a question, suggestion or feedback?
+We would love to hear from you.
+</p>
+
+<form id="contactForm">
+
+<label>Your name</label>
+<input id="contactName"
+type="text"
+placeholder="Enter your name"
+required>
+
+<label>Your email</label>
+<input id="contactEmail"
+type="email"
+placeholder="Enter your email"
+required>
+
+<label>Subject</label>
+<input id="contactSubject"
+type="text"
+placeholder="Enter subject"
+required>
+
+<label>Message</label>
+<textarea id="contactMessage"
+rows="6"
+placeholder="Write your message..."
+required></textarea>
+
+<button class="btn" type="submit">
+Send Message
+</button>
+
+<p id="contactStatus"></p>
+
+</form>
+
+</div>
+
+</main>
+
+<footer>
+<p>© <span id="year"></span> RK BlogSphere</p>
+</footer>
+
+</body>
+</html>
