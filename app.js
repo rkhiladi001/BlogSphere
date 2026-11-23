@@ -15,276 +15,331 @@
     posts: [],
     settings: {},
     userPosts: [],
-    allUsers: []
+    allUsers: [],
+    initialized: false
   };
 
-  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  })[char]);
+  // SECURITY: Escape HTML output
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[char]);
+  }
 
-  const isLoggedIn = () => !!state.session?.user;
+  // USER PERMISSIONS
+  function isLoggedIn() {
+    return !!state.session?.user;
+  }
 
-  const isSuperAdmin = () =>
-    state.profile?.role === 'super_admin';
+  function isSuperAdmin() {
+    return state.profile?.role === 'super_admin';
+  }
 
-  const isAdmin = () =>
-    ['admin', 'super_admin'].includes(state.profile?.role);
+  function isAdmin() {
+    return ['admin', 'super_admin'].includes(state.profile?.role);
+  }
 
-  const isWriter = () =>
-    ['author', 'editor', 'admin', 'super_admin'].includes(state.profile?.role);
+  function isWriter() {
+    return ['author', 'editor', 'admin', 'super_admin']
+      .includes(state.profile?.role);
+  }
 
+  // MESSAGES
   function message(id, text, error = false) {
-    const el = $(id);
-    if (!el) return;
-    el.textContent = text;
-    el.style.color = error ? '#dc2626' : '#15803d';
+    const element = $(id);
+    if (!element) return;
+
+    element.textContent = text;
+    element.style.color = error ? '#dc2626' : '#16a34a';
   }
 
-  function setStatus(text, error = false) {
-    message('feedStatus', text, error);
+  function setStatus(text) {
+    const element = $('feedStatus');
+    if (element) element.textContent = text || '';
   }
 
-  function showModal(html) {
+  // MODAL
+  function showModal(content) {
     const modal = $('modal');
-    const content = $('modalContent');
+    if (!modal) return;
 
-    if (!modal || !content) {
-      alert('Modal element is missing from this page.');
-      return;
-    }
+    modal.innerHTML = `
+      <div class="modal-overlay" data-close-modal>
+        <div class="modal-content" onclick="event.stopPropagation()">
+          ${content}
+        </div>
+      </div>
+    `;
 
-    content.innerHTML = html;
     modal.hidden = false;
   }
 
   function closeModal() {
     const modal = $('modal');
-    if (modal) modal.hidden = true;
+    if (!modal) return;
+
+    modal.hidden = true;
+    modal.innerHTML = '';
   }
 
+  // DATE FORMAT
   function formatDate(date) {
     if (!date) return '';
-    return new Date(date).toLocaleDateString();
+
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
   }
 
+  // USER NAME
   function getUserName() {
     return state.profile?.full_name ||
+      state.profile?.username ||
       state.session?.user?.email ||
       'User';
   }
 
-  function getAvatar() {
-    return state.profile?.avatar_url || '';
+  // USER AVATAR
+  function getAvatar(profile = state.profile) {
+    if (profile?.avatar_url) {
+      return esc(profile.avatar_url);
+    }
+
+    return 'https://ui-avatars.com/api/?name=' +
+      encodeURIComponent(profile?.full_name || 'User') +
+      '&background=2563eb&color=ffffff';
   }
 
-  // ==========================================
   // SUPABASE INITIALIZATION
-  // ==========================================
-
   function initializeSupabase() {
-    if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
-      throw new Error('Supabase URL or Anon Key is missing in config.js.');
-    }
+    try {
+      if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+        throw new Error('Supabase URL or Anon Key is missing in config.js.');
+      }
 
-    if (!window.supabase) {
-      throw new Error('Supabase library could not load.');
-    }
+      if (!window.supabase?.createClient) {
+        throw new Error('Supabase library could not load.');
+      }
 
-    state.db = window.supabase.createClient(
-      cfg.SUPABASE_URL,
-      cfg.SUPABASE_ANON_KEY
-    );
+      state.db = window.supabase.createClient(
+        cfg.SUPABASE_URL,
+        cfg.SUPABASE_ANON_KEY
+      );
+
+      console.log('RK BlogSphere: Supabase connected.');
+
+      return true;
+
+    } catch (error) {
+      console.error('Supabase initialization failed:', error);
+
+      state.db = null;
+
+      return false;
+    }
   }
 
-  // ==========================================
-  // AUTHENTICATION
-  // ==========================================
-
+  // AUTH BUTTONS
   function renderAuth() {
     const area = $('authArea');
     if (!area) return;
 
-    if (isLoggedIn()) {
+    if (!isLoggedIn()) {
       area.innerHTML = `
-        <div class="inlineform">
-          <span class="postmeta">${esc(getUserName())}</span>
-          <button class="smallbtn" id="profileBtn" type="button">
-            My Profile
-          </button>
-          <button class="smallbtn" id="logoutBtn" type="button">
-            Logout
-          </button>
-        </div>
-      `;
+        <button type="button" data-action="login">
+          Sign In
+        </button>
 
-      $('profileBtn').onclick = openProfile;
-      $('logoutBtn').onclick = logout;
-    } else {
-      area.innerHTML = `
-        <button class="btn" id="loginBtn" type="button">
-          Login / Sign up
+        <button type="button" data-action="signup">
+          Sign Up
         </button>
       `;
 
-      $('loginBtn').onclick = openAuthModal;
+      return;
     }
+
+    area.innerHTML = `
+      <div class="auth-user">
+        <img
+          src="${getAvatar()}"
+          alt="Profile"
+          width="36"
+          height="36"
+          style="border-radius:50%;object-fit:cover"
+        >
+
+        <span>${esc(getUserName())}</span>
+
+        <button type="button" data-action="profile">
+          My Profile
+        </button>
+
+        <button type="button" data-action="logout">
+          Logout
+        </button>
+      </div>
+    `;
   }
 
-  function openAuthModal() {
+  // AUTH MODAL
+  function openAuthModal(mode = 'login') {
+    if (!state.db) {
+      alert('Supabase connection is not ready. Please check config.js.');
+      return;
+    }
+
+    const signup = mode === 'signup';
+
     showModal(`
-      <h2>Welcome to RK BlogSphere</h2>
+      <div class="auth-modal">
 
-      <form id="loginForm" class="adminlist">
-        <h3>Login</h3>
-
-        <label>Email Address</label>
-        <input id="loginEmail"
-          type="email"
-          autocomplete="email"
-          required
-          placeholder="Enter your email">
-
-        <label>Password</label>
-        <input id="loginPassword"
-          type="password"
-          autocomplete="current-password"
-          required
-          placeholder="Enter password">
-
-        <button class="btn" type="submit">Login</button>
-        <p id="loginMessage" aria-live="polite"></p>
-      </form>
-
-      <hr>
-
-      <form id="signupForm" class="adminlist">
-        <h3>Create Account</h3>
-
-        <label>Full Name</label>
-        <input id="signupName"
-          type="text"
-          maxlength="80"
-          autocomplete="name"
-          required
-          placeholder="Enter your full name">
-
-        <label>Email Address</label>
-        <input id="signupEmail"
-          type="email"
-          autocomplete="email"
-          required
-          placeholder="Enter your email">
-
-        <label>Password</label>
-        <input id="signupPassword"
-          type="password"
-          autocomplete="new-password"
-          minlength="6"
-          required
-          placeholder="Minimum 6 characters">
-
-        <button class="btn" type="submit">
-          Create Account
+        <button type="button"
+          data-close-modal
+          class="modal-close">
+          ×
         </button>
 
-        <p id="signupMessage" aria-live="polite"></p>
-      </form>
+        <h2>${signup ? 'Create Account' : 'Welcome Back'}</h2>
+
+        <form id="authForm">
+
+          ${signup ? `
+            <label>Full Name</label>
+            <input
+              type="text"
+              id="authName"
+              placeholder="Enter your full name"
+              required
+              minlength="2"
+            >
+          ` : ''}
+
+          <label>Email Address</label>
+          <input
+            type="email"
+            id="authEmail"
+            placeholder="Enter your email"
+            required
+          >
+
+          <label>Password</label>
+          <input
+            type="password"
+            id="authPassword"
+            placeholder="Enter password"
+            required
+            minlength="6"
+          >
+
+          <p id="authMessage"></p>
+
+          <button type="submit" id="authSubmit">
+            ${signup ? 'Create Account' : 'Sign In'}
+          </button>
+
+        </form>
+
+        <p>
+          ${signup ? 'Already have an account?' : 'New user?'}
+          <button type="button"
+            data-action="${signup ? 'login' : 'signup'}">
+            ${signup ? 'Sign In' : 'Sign Up'}
+          </button>
+        </p>
+
+      </div>
     `);
 
-    $('loginForm').onsubmit = async (event) => {
+    $('authForm')?.addEventListener('submit', async event => {
       event.preventDefault();
 
-      const email = $('loginEmail').value.trim();
-      const password = $('loginPassword').value;
+      const button = $('authSubmit');
+      const email = $('authEmail')?.value.trim();
+      const password = $('authPassword')?.value;
+      const fullName = $('authName')?.value.trim();
 
-      message('loginMessage', 'Logging in...');
-
-      try {
-        const { error } = await state.db.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) throw error;
-
-        message('loginMessage', 'Login successful!');
-        closeModal();
-      } catch (error) {
-        message('loginMessage', error.message, true);
-      }
-    };
-
-    $('signupForm').onsubmit = async (event) => {
-      event.preventDefault();
-
-      const fullName = $('signupName').value.trim();
-      const email = $('signupEmail').value.trim();
-      const password = $('signupPassword').value;
-
-      if (!fullName || !email || password.length < 6) {
-        message(
-          'signupMessage',
-          'Enter your name, valid email and password of at least 6 characters.',
-          true
-        );
+      if (signup && !fullName) {
+        message('authMessage', 'Please enter your full name.', true);
         return;
       }
 
-      message('signupMessage', 'Creating your account...');
+      button.disabled = true;
+      button.textContent = 'Please wait...';
 
       try {
-        const { data, error } = await state.db.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName
+        let result;
+
+        if (signup) {
+          result = await state.db.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName
+              }
             }
-          }
-        });
+          });
+        } else {
+          result = await state.db.auth.signInWithPassword({
+            email,
+            password
+          });
+        }
 
-        if (error) throw error;
+        if (result.error) throw result.error;
 
-        $('signupForm').reset();
+        if (signup && !result.data.session) {
+          closeModal();
+          alert('Account created. Please verify your email, then sign in.');
+          return;
+        }
 
-        message(
-          'signupMessage',
-          data.session
-            ? 'Account created! Your username has been generated automatically.'
-            : 'Account created! Please confirm your email. Your username will be generated automatically.'
-        );
+        closeModal();
+
+        await handleAuthState(result.data.session);
 
       } catch (error) {
-        message('signupMessage', error.message, true);
+        message('authMessage', error.message, true);
+
+      } finally {
+        if ($('authSubmit')) {
+          $('authSubmit').disabled = false;
+          $('authSubmit').textContent =
+            signup ? 'Create Account' : 'Sign In';
+        }
       }
-    };
+    });
   }
 
+  // LOGOUT
   async function logout() {
-    try {
-      const { error } = await state.db.auth.signOut();
-      if (error) throw error;
-      closeModal();
-    } catch (error) {
+    if (!state.db) return;
+
+    const { error } = await state.db.auth.signOut();
+
+    if (error) {
       alert(error.message);
-    }
-  }
-
-  // ==========================================
-  // USER PROFILE
-  // ==========================================
-
-  async function loadProfile() {
-    state.profile = null;
-
-    if (!isLoggedIn()) {
-      renderAuth();
       return;
     }
+
+    state.session = null;
+    state.profile = null;
+
+    renderAuth();
+    setupPageAccess();
+
+    alert('Logged out successfully.');
+    location.reload();
+  }
+    // LOAD USER PROFILE
+  async function loadProfile() {
+    if (!state.session?.user || !state.db) return;
 
     try {
       const { data, error } = await state.db
@@ -298,134 +353,193 @@
       state.profile = data || null;
 
       if (!state.profile) {
-        console.warn('Profile not found. Check the Supabase signup trigger.');
+        console.warn('User profile not found.');
       }
 
     } catch (error) {
       console.error('Profile loading error:', error);
+      state.profile = null;
     }
 
     renderAuth();
   }
 
+  // OPEN PROFILE
   function openProfile() {
-    if (!isLoggedIn()) {
-      openAuthModal();
+    if (!isLoggedIn() || !state.profile) {
+      alert('Please sign in first.');
       return;
     }
 
-    const profile = state.profile || {};
-
     showModal(`
-      <h2>My Profile</h2>
+      <div class="profile-modal">
 
-      <div class="adminlist">
+        <button type="button"
+          data-close-modal
+          class="modal-close">×</button>
 
-        <div style="text-align:center">
-          ${profile.avatar_url
-            ? `<img src="${esc(profile.avatar_url)}"
-                alt="Profile photo"
-                style="width:110px;height:110px;object-fit:cover;border-radius:50%">`
-            : `<div style="width:110px;height:110px;border-radius:50%;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;font-size:35px">👤</div>`
-          }
+        <h2>My Profile</h2>
+
+        <div class="profile-avatar">
+          <img
+            src="${getAvatar()}"
+            alt="Profile Photo"
+            width="100"
+            height="100"
+            style="border-radius:50%;object-fit:cover"
+          >
         </div>
 
-        <label>Upload Profile Photo</label>
-        <input id="profilePhoto"
-          type="file"
-          accept="image/jpeg,image/png,image/webp">
+        <label>Profile Photo</label>
+        <input type="file"
+          id="profilePhoto"
+          accept="image/*">
 
-        <label>Full Name</label>
-        <input id="profileFullName"
-          maxlength="80"
-          value="${esc(profile.full_name || '')}">
+        <form id="profileForm">
 
-        <label>Username</label>
-        <input value="${esc(profile.username || '')}" disabled>
+          <label>Full Name</label>
+          <input
+            type="text"
+            id="profileName"
+            value="${esc(state.profile.full_name || '')}"
+            required
+          >
 
-        <label>Email</label>
-        <input value="${esc(state.session.user.email || '')}" disabled>
+          <label>Username</label>
+          <input
+            type="text"
+            value="${esc(state.profile.username || '')}"
+            disabled
+          >
 
-        <label>Mobile Number (Optional)</label>
-        <input id="profilePhone"
-          type="tel"
-          maxlength="20"
-          value="${esc(profile.phone || '')}"
-          placeholder="Enter mobile number">
+          <label>Email</label>
+          <input
+            type="email"
+            value="${esc(state.session.user.email || '')}"
+            disabled
+          >
 
-        <label>About Me / Bio</label>
-        <textarea id="profileBio"
-          rows="5"
-          maxlength="1000"
-          placeholder="Tell readers about yourself">${esc(profile.bio || '')}</textarea>
+          <label>Mobile Number (Optional)</label>
+          <input
+            type="tel"
+            id="profilePhone"
+            value="${esc(state.profile.phone || '')}"
+            placeholder="Enter mobile number"
+          >
 
-        <button class="btn" id="saveProfileBtn" type="button">
-          Save Profile
-        </button>
+          <label>Bio</label>
+          <textarea
+            id="profileBio"
+            rows="4"
+            placeholder="Tell us about yourself"
+          >${esc(state.profile.bio || '')}</textarea>
 
-        <p id="profileMessage" aria-live="polite"></p>
+          <p id="profileMessage"></p>
+
+          <button type="submit" id="saveProfileButton">
+            Save Profile
+          </button>
+
+        </form>
       </div>
     `);
 
-    $('saveProfileBtn').onclick = saveProfile;
+    $('profileForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      await saveProfile();
+    });
+
+    $('profilePhoto')?.addEventListener('change', async event => {
+      const file = event.target.files?.[0];
+
+      if (file) {
+        await uploadProfilePhoto(file);
+      }
+    });
   }
 
+  // UPLOAD PROFILE PHOTO
   async function uploadProfilePhoto(file) {
-    if (!file) return state.profile?.avatar_url || '';
+    if (!state.db || !isLoggedIn()) return;
 
     if (!file.type.startsWith('image/')) {
-      throw new Error('Please select an image file.');
+      alert('Please select an image file.');
+      return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Image size must be less than 5 MB.');
+      alert('Image size must be less than 5 MB.');
+      return;
     }
 
-    const extension = file.name.split('.').pop().toLowerCase();
-    const path = `${state.session.user.id}/profile-${Date.now()}.${extension}`;
+    try {
+      const extension = file.name.split('.').pop().toLowerCase();
 
-    const { error } = await state.db.storage
-      .from('blog-images')
-      .upload(path, file, {
-        upsert: true
-      });
+      const path =
+        `${state.session.user.id}/profile-${Date.now()}.${extension}`;
 
-    if (error) throw error;
+      const { error: uploadError } = await state.db.storage
+        .from('blog-images')
+        .upload(path, file, {
+          upsert: true
+        });
 
-    const { data } = state.db.storage
-      .from('blog-images')
-      .getPublicUrl(path);
+      if (uploadError) throw uploadError;
 
-    return data.publicUrl;
+      const { data } = state.db.storage
+        .from('blog-images')
+        .getPublicUrl(path);
+
+      const { data: updatedProfile, error } = await state.db
+        .from('profiles')
+        .update({
+          avatar_url: data.publicUrl
+        })
+        .eq('id', state.session.user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      state.profile = updatedProfile;
+
+      alert('Profile photo uploaded successfully.');
+
+      openProfile();
+      renderAuth();
+
+    } catch (error) {
+      alert('Photo upload failed: ' + error.message);
+    }
   }
 
+  // SAVE PROFILE
   async function saveProfile() {
-    const button = $('saveProfileBtn');
-    button.disabled = true;
+    if (!state.db || !isLoggedIn()) return;
 
-    message('profileMessage', 'Saving profile...');
+    const button = $('saveProfileButton');
+
+    const fullName = $('profileName')?.value.trim();
+    const phone = $('profilePhone')?.value.trim() || null;
+    const bio = $('profileBio')?.value.trim() || null;
+
+    if (!fullName) {
+      message('profileMessage', 'Full Name is required.', true);
+      return;
+    }
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Saving...';
+    }
 
     try {
-      const fullName = $('profileFullName').value.trim();
-      const phone = $('profilePhone').value.trim();
-      const bio = $('profileBio').value.trim();
-      const file = $('profilePhoto').files[0];
-
-      if (!fullName) {
-        throw new Error('Full Name is required.');
-      }
-
-      const avatarUrl = file
-        ? await uploadProfilePhoto(file)
-        : state.profile?.avatar_url || null;
-
       const { data, error } = await state.db
         .from('profiles')
         .update({
           full_name: fullName,
-          phone: phone || null,
-          bio: bio || null,
-          avatar_url: avatarUrl
+          phone,
+          bio
         })
         .eq('id', state.session.user.id)
         .select()
@@ -435,20 +549,25 @@
 
       state.profile = data;
 
-      message('profileMessage', 'Profile updated successfully!');
+      message('profileMessage', 'Profile saved successfully.');
+
       renderAuth();
 
     } catch (error) {
       message('profileMessage', error.message, true);
-    } finally {
-      button.disabled = false;
-    }
-        }
-    // ==========================================
-  // WEBSITE SETTINGS
-  // ==========================================
 
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Save Profile';
+      }
+    }
+  }
+
+  // LOAD WEBSITE SETTINGS
   async function loadSettings() {
+    if (!state.db) return;
+
     try {
       const { data, error } = await state.db
         .from('site_settings')
@@ -458,107 +577,113 @@
 
       state.settings = {};
 
-      (data || []).forEach(row => {
-        state.settings[row.key] = row.value;
+      (data || []).forEach(item => {
+        state.settings[item.key] = item.value;
       });
 
       applySettings();
+
     } catch (error) {
-      console.warn('Settings:', error.message);
+      console.warn('Settings loading error:', error);
     }
   }
 
+  // APPLY WEBSITE SETTINGS
   function applySettings() {
     const settings = state.settings;
-    const siteName = settings.site_name || 'RK BlogSphere';
 
-    document.title = siteName;
-
-    const brand = document.querySelector('.rkb-brand-text');
-    if (brand) brand.textContent = siteName;
-
-    const footer = document.querySelector('footer p');
-    if (footer) {
-      footer.textContent =
-        `© ${new Date().getFullYear()} ${siteName} · Made for readers and writers`;
+    if (settings.site_title) {
+      document.title = settings.site_title;
     }
 
-    const heroTitle = document.querySelector('.hero h1');
+    const brand = $('siteName');
+
+    if (brand && settings.site_title) {
+      brand.textContent = settings.site_title;
+    }
+
+    const footer = $('footerText');
+
+    if (footer && settings.footer_text) {
+      footer.textContent = settings.footer_text;
+    }
+
+    const heroTitle = $('heroTitle');
+
     if (heroTitle && settings.hero_title) {
       heroTitle.textContent = settings.hero_title;
     }
 
-    const heroDescription =
-      document.querySelector('.hero > div > p:not(.eyebrow)');
+    const heroDescription = $('heroDescription');
 
     if (heroDescription && settings.hero_description) {
       heroDescription.textContent = settings.hero_description;
     }
 
-    const logos = {
-      logo_header: '.rkb-header-logo',
-      logo_home: '.rkb-hero-logo',
-      logo_login: '.rkb-auth-logo',
-      logo_footer: '.rkb-footer-logo'
-    };
+    const logo = $('siteLogo');
 
-    Object.entries(logos).forEach(([key, selector]) => {
-      const image = document.querySelector(selector);
-      if (image && settings[key]) image.src = settings[key];
-    });
+    if (logo && settings.logo_url) {
+      logo.src = settings.logo_url;
+      logo.hidden = false;
+    }
   }
 
-  // ==========================================
-  // CATEGORIES
-  // ==========================================
-
+  // LOAD CATEGORIES
   async function loadCategories() {
+    if (!state.db) return;
+
     try {
       const { data, error } = await state.db
         .from('categories')
         .select('*')
-        .order('name');
+        .order('name', { ascending: true });
 
       if (error) throw error;
 
       state.categories = data || [];
 
       const filter = $('categoryFilter');
-
-      if (filter) {
-        filter.innerHTML =
-          '<option value="">All categories</option>' +
-          state.categories.map(category =>
-            `<option value="${esc(category.id)}">${esc(category.name)}</option>`
-          ).join('');
-      }
-
       const postCategory = $('postCategory');
 
+      if (filter) {
+        filter.innerHTML = `
+          <option value="">All Categories</option>
+          ${state.categories.map(category => `
+            <option value="${esc(category.id)}">
+              ${esc(category.name)}
+            </option>
+          `).join('')}
+        `;
+      }
+
       if (postCategory) {
-        postCategory.innerHTML =
-          '<option value="">Select category</option>' +
-          state.categories.map(category =>
-            `<option value="${esc(category.id)}">${esc(category.name)}</option>`
-          ).join('');
+        postCategory.innerHTML = `
+          <option value="">Select Category</option>
+          ${state.categories.map(category => `
+            <option value="${esc(category.id)}">
+              ${esc(category.name)}
+            </option>
+          `).join('')}
+        `;
       }
 
     } catch (error) {
-      console.error('Categories:', error.message);
+      console.error('Categories loading error:', error);
     }
   }
 
+  // CATEGORY NAME
   function categoryName(id) {
-    return state.categories.find(category =>
-      String(category.id) === String(id)
-    )?.name || 'General';
-  }
+    const category = state.categories.find(
+      item => String(item.id) === String(id)
+    );
 
-  // ==========================================
-  // PUBLIC ARTICLES
-  // ==========================================
-
+    return category?.name || 'Uncategorized';
+              }
+    // LOAD POSTS
   async function loadPosts() {
+    if (!state.db) return;
+
     const host = $('posts');
     if (!host) return;
 
@@ -571,7 +696,7 @@
         .eq('status', 'published')
         .order('created_at', { ascending: false });
 
-      const search = $('search')?.value?.trim();
+      const search = $('searchInput')?.value.trim();
       const category = $('categoryFilter')?.value;
 
       if (search) {
@@ -588,12 +713,16 @@
 
       state.posts = data || [];
 
-      renderPosts(state.posts);
+      renderPosts();
 
-      setStatus(`${state.posts.length} articles available`);
+      setStatus(
+        state.posts.length
+          ? `${state.posts.length} articles found.`
+          : 'No articles found.'
+      );
 
     } catch (error) {
-      setStatus(error.message, true);
+      console.error('Posts loading error:', error);
 
       host.innerHTML = `
         <div class="empty">
@@ -601,37 +730,41 @@
           <p>${esc(error.message)}</p>
         </div>
       `;
+
+      setStatus('Unable to load articles.');
     }
   }
 
-  function renderPosts(posts) {
+  // RENDER POSTS
+  function renderPosts() {
     const host = $('posts');
     if (!host) return;
 
-    if (!posts.length) {
+    if (!state.posts.length) {
       host.innerHTML = `
         <div class="empty">
-          <h3>No articles found</h3>
+          <h3>No Articles Yet</h3>
           <p>New articles will appear here.</p>
         </div>
       `;
       return;
     }
 
-    host.innerHTML = posts.map(post => `
-      <article class="postcard">
+    host.innerHTML = state.posts.map(post => `
+      <article class="post-card">
 
-        ${(post.cover_image || post.image_url)
-          ? `<img class="postcover"
-              src="${esc(post.cover_image || post.image_url)}"
-              alt="${esc(post.title)}"
-              loading="lazy">`
-          : ''
-        }
+        ${(post.cover_image || post.image_url) ? `
+          <img
+            class="post-cover"
+            src="${esc(post.cover_image || post.image_url)}"
+            alt="${esc(post.title)}"
+            loading="lazy"
+          >
+        ` : ''}
 
-        <div class="postbody">
+        <div class="post-card-content">
 
-          <span class="categorytag">
+          <span class="post-category">
             ${esc(categoryName(post.category_id))}
           </span>
 
@@ -639,146 +772,119 @@
 
           <p>${esc(post.excerpt || '')}</p>
 
-          <div class="postmeta">
-            ${esc(post.author_name || 'RK BlogSphere')}
-            · ${formatDate(post.created_at)}
+          <div class="post-meta">
+            <span>${esc(post.author_name || 'Author')}</span>
+            <span>${formatDate(post.created_at)}</span>
           </div>
 
-          <div class="inlineform">
-            <button class="btn smallbtn readPostBtn"
-              data-id="${esc(post.id)}">
-              Read More
-            </button>
+          <button
+            type="button"
+            data-post-id="${esc(post.id)}">
+            Read More
+          </button>
 
-            <button class="smallbtn likePostBtn"
-              data-id="${esc(post.id)}">
-              ♥ ${Number(post.likes_count || 0)}
-            </button>
-          </div>
+          <button
+            type="button"
+            data-like-post="${esc(post.id)}">
+            Like
+          </button>
+
+          <button
+            type="button"
+            data-bookmark-post="${esc(post.id)}">
+            Bookmark
+          </button>
 
         </div>
       </article>
     `).join('');
-
-    host.querySelectorAll('.readPostBtn').forEach(button => {
-      button.onclick = () => openPost(button.dataset.id);
-    });
-
-    host.querySelectorAll('.likePostBtn').forEach(button => {
-      button.onclick = () => likePost(button.dataset.id);
-    });
   }
 
-  // ==========================================
-  // ARTICLE DETAILS
-  // ==========================================
+  // OPEN POST
+  async function openPost(postId) {
+    if (!state.db) return;
 
-  async function openPost(id) {
-    const post = state.posts.find(item =>
-      String(item.id) === String(id)
-    );
+    try {
+      const { data: post, error } = await state.db
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .single();
 
-    if (!post) return;
+      if (error) throw error;
 
-    const image = post.cover_image || post.image_url;
+      showModal(`
+        <article class="single-post">
 
-    showModal(`
-      <article class="articleview">
+          <button type="button"
+            data-close-modal
+            class="modal-close">×</button>
 
-        ${image
-          ? `<img class="postcover"
-              src="${esc(image)}"
-              alt="${esc(post.title)}">`
-          : ''
-        }
+          ${(post.cover_image || post.image_url) ? `
+            <img
+              src="${esc(post.cover_image || post.image_url)}"
+              alt="${esc(post.title)}"
+              class="single-post-cover"
+            >
+          ` : ''}
 
-        <span class="categorytag">
-          ${esc(categoryName(post.category_id))}
-        </span>
+          <span>${esc(categoryName(post.category_id))}</span>
 
-        <h1>${esc(post.title)}</h1>
+          <h1>${esc(post.title)}</h1>
 
-        <p class="postmeta">
-          ${esc(post.author_name || 'RK BlogSphere')}
-          · ${formatDate(post.created_at)}
-        </p>
+          <p>
+            By ${esc(post.author_name || 'Author')}
+            · ${formatDate(post.created_at)}
+          </p>
 
-        <p>${esc(post.excerpt || '')}</p>
+          <div class="post-content">
+            ${esc(post.content).replace(/\n/g, '<br>')}
+          </div>
 
-        <div class="articlecontent">
-          ${esc(post.content || '').replace(/\n/g, '<br>')}
-        </div>
+          <hr>
 
-        <div class="inlineform">
-          <button class="btn" id="detailLikeBtn">♥ Like</button>
-          <button class="btn secondary" id="detailBookmarkBtn">
-            Bookmark
-          </button>
-        </div>
+          <h3>Comments</h3>
 
-        <h3>Comments</h3>
+          <div id="commentsArea">
+            Loading comments...
+          </div>
 
-        <div id="commentsList">Loading comments...</div>
+          ${isLoggedIn() ? `
+            <form id="commentForm">
+              <textarea
+                id="commentText"
+                placeholder="Write your comment..."
+                required
+                rows="3"
+              ></textarea>
 
-        <form id="commentForm" class="adminlist">
-          <textarea id="commentText"
-            rows="3"
-            placeholder="Write your comment"
-            required></textarea>
+              <button type="submit">
+                Submit Comment
+              </button>
+            </form>
+          ` : `
+            <p>Please sign in to comment.</p>
+          `}
 
-          <button class="btn" type="submit">
-            Submit Comment
-          </button>
+        </article>
+      `);
 
-          <p id="commentMessage"></p>
-        </form>
+      await loadComments(postId);
 
-      </article>
-    `);
+      $('commentForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        await addComment(postId);
+      });
 
-    $('detailLikeBtn').onclick = () => likePost(id);
-    $('detailBookmarkBtn').onclick = () => bookmarkPost(id);
-
-    await loadComments(id);
-
-    $('commentForm').onsubmit = async event => {
-      event.preventDefault();
-
-      if (!isLoggedIn()) {
-        openAuthModal();
-        return;
-      }
-
-      const content = $('commentText').value.trim();
-
-      if (!content) return;
-
-      try {
-        const { error } = await state.db
-          .from('comments')
-          .insert({
-            post_id: id,
-            user_id: state.session.user.id,
-            content
-          });
-
-        if (error) throw error;
-
-        $('commentText').value = '';
-
-        message('commentMessage', 'Comment submitted successfully.');
-
-        await loadComments(id);
-
-      } catch (error) {
-        message('commentMessage', error.message, true);
-      }
-    };
+    } catch (error) {
+      alert('Unable to open article: ' + error.message);
+    }
   }
 
+  // LOAD COMMENTS
   async function loadComments(postId) {
-    const host = $('commentsList');
-    if (!host) return;
+    const host = $('commentsArea');
+    if (!host || !state.db) return;
 
     try {
       const { data, error } = await state.db
@@ -789,25 +895,58 @@
 
       if (error) throw error;
 
-      host.innerHTML = (data || []).map(comment => `
-        <div class="comment">
-          <p>${esc(comment.content)}</p>
+      if (!data?.length) {
+        host.innerHTML = '<p>No comments yet.</p>';
+        return;
+      }
+
+      host.innerHTML = data.map(comment => `
+        <div class="comment-item">
+          <strong>${esc(comment.author_name || 'User')}</strong>
+          <p>${esc(comment.content || comment.comment || '')}</p>
           <small>${formatDate(comment.created_at)}</small>
         </div>
-      `).join('') || '<p>No comments yet.</p>';
+      `).join('');
 
     } catch (error) {
-      host.textContent = 'Comments could not be loaded.';
+      host.textContent = 'Unable to load comments: ' + error.message;
     }
   }
 
-  // ==========================================
-  // LIKES AND BOOKMARKS
-  // ==========================================
+  // ADD COMMENT
+  async function addComment(postId) {
+    if (!isLoggedIn()) {
+      alert('Please sign in first.');
+      return;
+    }
 
+    const content = $('commentText')?.value.trim();
+
+    if (!content) return;
+
+    try {
+      const { error } = await state.db
+        .from('comments')
+        .insert({
+          post_id: postId,
+          user_id: state.session.user.id,
+          author_name: getUserName(),
+          content
+        });
+
+      if (error) throw error;
+
+      await loadComments(postId);
+
+    } catch (error) {
+      alert('Comment failed: ' + error.message);
+    }
+  }
+
+  // LIKE POST
   async function likePost(postId) {
     if (!isLoggedIn()) {
-      openAuthModal();
+      alert('Please sign in to like articles.');
       return;
     }
 
@@ -819,22 +958,26 @@
           user_id: state.session.user.id
         });
 
-      if (error && !String(error.message).toLowerCase().includes('duplicate')) {
+      if (error) {
+        if (error.code === '23505') {
+          alert('You have already liked this article.');
+          return;
+        }
+
         throw error;
       }
 
-      alert('Article liked successfully!');
-
-      await loadPosts();
+      alert('Article liked successfully.');
 
     } catch (error) {
-      alert(error.message);
+      alert('Like failed: ' + error.message);
     }
   }
 
+  // BOOKMARK POST
   async function bookmarkPost(postId) {
     if (!isLoggedIn()) {
-      openAuthModal();
+      alert('Please sign in to bookmark articles.');
       return;
     }
 
@@ -846,40 +989,42 @@
           user_id: state.session.user.id
         });
 
-      if (error && !String(error.message).toLowerCase().includes('duplicate')) {
+      if (error) {
+        if (error.code === '23505') {
+          alert('Article is already bookmarked.');
+          return;
+        }
+
         throw error;
       }
 
-      alert('Article bookmarked successfully!');
+      alert('Article bookmarked successfully.');
 
     } catch (error) {
-      alert(error.message);
+      alert('Bookmark failed: ' + error.message);
     }
   }
 
-  // ==========================================
-  // IMAGE UPLOAD
-  // ==========================================
-
-  async function uploadImage(file, folder) {
-    if (!file) return '';
+  // UPLOAD POST IMAGE
+  async function uploadImage(file) {
+    if (!state.db || !isLoggedIn()) return null;
 
     if (!file.type.startsWith('image/')) {
-      throw new Error('Please select a valid image.');
+      throw new Error('Please select an image file.');
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Image size must be below 5 MB.');
+      throw new Error('Image size must be less than 5 MB.');
     }
 
     const extension = file.name.split('.').pop().toLowerCase();
 
     const path =
-      `${state.session.user.id}/${folder}-${Date.now()}.${extension}`;
+      `${state.session.user.id}/post-${Date.now()}.${extension}`;
 
     const { error } = await state.db.storage
       .from('blog-images')
-      .upload(path, file, { upsert: true });
+      .upload(path, file);
 
     if (error) throw error;
 
@@ -888,180 +1033,252 @@
       .getPublicUrl(path);
 
     return data.publicUrl;
-  }
-
-  // ==========================================
-  // WRITING PERMISSION
-  // ==========================================
-
+        }
+    // WRITE FORM ACCESS
   function renderWriteForm() {
     const prompt = $('writePrompt');
-    const form = $('postForm');
-
-    if (!form) return;
-
-    const allowed = isWriter();
-
-    if (prompt) prompt.hidden = allowed;
-
-    form.hidden = !allowed;
-
-    if (!allowed && prompt) {
-      prompt.innerHTML = `
-        <h3>Writer Access Required</h3>
-        <p>Login with an authorized writer account to publish articles.</p>
-      `;
-    }
-  }
-
-  // ==========================================
-  // SUBMIT ARTICLE
-  // ==========================================
-
-  async function submitPost(event) {
-    event.preventDefault();
+    const form = $('writeForm');
 
     if (!isWriter()) {
-      alert('Writer permission is required.');
+      if (prompt) {
+        prompt.hidden = false;
+        prompt.textContent = 'Please sign in with an Author account to write articles.';
+      }
+
+      if (form) form.hidden = true;
       return;
     }
 
-    message('postMessage', 'Submitting article...');
+    if (prompt) prompt.hidden = true;
+    if (form) form.hidden = false;
+  }
+
+  // SUBMIT OR UPDATE POST
+  async function submitPost() {
+    if (!isWriter()) {
+      alert('You do not have permission to publish posts.');
+      return;
+    }
+
+    const form = $('writeForm');
+
+    const title = $('postTitle')?.value.trim();
+    const excerpt = $('postExcerpt')?.value.trim();
+    const content = $('postContent')?.value.trim();
+    const categoryId = $('postCategory')?.value || null;
+    const status = $('postStatus')?.value || 'draft';
+    const coverFile = $('postImage')?.files?.[0];
+
+    if (!title || !content) {
+      alert('Please enter post title and content.');
+      return;
+    }
+
+    const button = form?.querySelector('[type="submit"]');
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Saving...';
+    }
 
     try {
-      const file = $('coverFile')?.files?.[0];
+      let coverImage = null;
 
-      const cover = file
-        ? await uploadImage(file, 'cover')
-        : '';
-
-      const payload = {
-        title: $('postTitle').value.trim(),
-        excerpt: $('postExcerpt').value.trim(),
-        content: $('postContent').value.trim(),
-        category_id: $('postCategory').value || null,
-        cover_image: cover || null,
-        author_id: state.session.user.id,
-        author_name: getUserName(),
-        status: isAdmin() ? 'published' : 'pending'
-      };
-
-      if (!payload.title || !payload.content) {
-        throw new Error('Title and article content are required.');
+      if (coverFile) {
+        coverImage = await uploadImage(coverFile);
       }
 
-      const { error } = await state.db
+      const postData = {
+        title,
+        excerpt,
+        content,
+        category_id: categoryId,
+        status,
+        author_id: state.session.user.id,
+        author_name: getUserName()
+      };
+
+      if (coverImage) {
+        postData.cover_image = coverImage;
+      }
+
+      const editingId = form?.dataset.editingId;
+
+      let result;
+
+      if (editingId) {
+        result = await state.db
+          .from('posts')
+          .update(postData)
+          .eq('id', editingId)
+          .eq('author_id', state.session.user.id);
+      } else {
+        result = await state.db
+          .from('posts')
+          .insert(postData);
+      }
+
+      if (result.error) throw result.error;
+
+      if (form) {
+        form.reset();
+        delete form.dataset.editingId;
+      }
+
+      alert(editingId
+        ? 'Post updated successfully.'
+        : 'Post submitted successfully.');
+
+      await loadPosts();
+      await loadUserPosts();
+
+    } catch (error) {
+      alert('Post save failed: ' + error.message);
+
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Submit Article';
+      }
+    }
+  }
+
+  // LOAD USER POSTS
+  async function loadUserPosts() {
+    if (!isWriter() || !state.db) return;
+
+    try {
+      const { data, error } = await state.db
         .from('posts')
-        .insert(payload);
+        .select('*')
+        .eq('author_id', state.session.user.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      message(
-        'postMessage',
-        isAdmin()
-          ? 'Article published successfully!'
-          : 'Article submitted for approval.'
-      );
+      state.userPosts = data || [];
 
-      $('postForm').reset();
+      renderUserPosts();
 
     } catch (error) {
-      message('postMessage', error.message, true);
-    }
-    }
-    // USER DASHBOARD
-  async function loadUserPosts() {
-    if (!state.session) return;
-
-    const { data, error } = await state.db
-      .from('posts')
-      .select('*')
-      .eq('author_id', state.session.user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
       console.error('User posts error:', error);
-      return;
     }
-
-    state.userPosts = data || [];
-    renderUserPosts();
   }
 
+  // RENDER USER POSTS
   function renderUserPosts() {
-    const container = $('myPosts');
-    if (!container) return;
+    const host = $('myPosts');
+    if (!host) return;
 
     if (!state.userPosts.length) {
-      container.innerHTML = '<p>You have not published any posts yet.</p>';
+      host.innerHTML = '<p>You have not written any articles yet.</p>';
       return;
     }
 
-    container.innerHTML = state.userPosts.map(post => `
-      <article class="user-post-item">
-        <h3>${esc(post.title || 'Untitled')}</h3>
-        <p>Status: ${esc(post.status || 'draft')}</p>
-        <p>${formatDate(post.created_at)}</p>
-        <button type="button" data-edit-post="${esc(post.id)}">
+    host.innerHTML = state.userPosts.map(post => `
+      <div class="my-post-item">
+
+        <h3>${esc(post.title)}</h3>
+
+        <p>
+          Status:
+          <strong>${esc(post.status)}</strong>
+        </p>
+
+        <button
+          type="button"
+          data-edit-post="${esc(post.id)}">
           Edit
         </button>
-        <button type="button" data-delete-post="${esc(post.id)}">
+
+        <button
+          type="button"
+          data-delete-post="${esc(post.id)}">
           Delete
         </button>
-      </article>
+
+      </div>
     `).join('');
   }
 
-  async function editPost(postId) {
-    const post = state.userPosts.find(item => String(item.id) === String(postId));
-    if (!post) return;
+  // EDIT POST
+  function editPost(postId) {
+    const post = state.userPosts.find(
+      item => String(item.id) === String(postId)
+    );
 
-    const title = $('postTitle');
-    const excerpt = $('postExcerpt');
-    const content = $('postContent');
-    const category = $('postCategory');
-    const status = $('postStatus');
+    if (!post) {
+      alert('Post not found.');
+      return;
+    }
 
-    if (title) title.value = post.title || '';
-    if (excerpt) excerpt.value = post.excerpt || '';
-    if (content) content.value = post.content || '';
-    if (category) category.value = post.category_id || '';
-    if (status) status.value = post.status || 'draft';
+    if (!isWriter()) return;
 
     const form = $('writeForm');
-    if (form) {
-      form.dataset.editingId = post.id;
-      form.scrollIntoView({ behavior: 'smooth' });
-    }
-  }
 
-  async function deletePost(postId) {
-    if (!confirm('Are you sure you want to delete this post?')) return;
-
-    const { error } = await state.db
-      .from('posts')
-      .delete()
-      .eq('id', postId)
-      .eq('author_id', state.session.user.id);
-
-    if (error) {
-      alert(error.message);
+    if (!form) {
+      alert('Write form not found.');
       return;
     }
 
-    alert('Post deleted successfully.');
-    await loadUserPosts();
-    await loadPosts();
+    $('postTitle').value = post.title || '';
+    $('postExcerpt').value = post.excerpt || '';
+    $('postContent').value = post.content || '';
+    $('postCategory').value = post.category_id || '';
+
+    if ($('postStatus')) {
+      $('postStatus').value = post.status || 'draft';
+    }
+
+    form.dataset.editingId = post.id;
+
+    const button = form.querySelector('[type="submit"]');
+
+    if (button) {
+      button.textContent = 'Update Article';
+    }
+
+    form.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
   }
 
-  // ADMIN: CATEGORY MANAGEMENT
+  // DELETE POST
+  async function deletePost(postId) {
+    if (!isWriter()) return;
+
+    if (!confirm('Are you sure you want to delete this article?')) {
+      return;
+    }
+
+    try {
+      const { error } = await state.db
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('author_id', state.session.user.id);
+
+      if (error) throw error;
+
+      alert('Article deleted successfully.');
+
+      await loadUserPosts();
+      await loadPosts();
+
+    } catch (error) {
+      alert('Delete failed: ' + error.message);
+    }
+  }
+
+  // ADD CATEGORY
   async function addCategory() {
     if (!isAdmin()) {
-      alert('You do not have permission.');
+      alert('Admin permission required.');
       return;
     }
 
-    const input = $('newCategory');
+    const input = $('categoryName');
     const name = input?.value.trim();
 
     if (!name) {
@@ -1069,131 +1286,181 @@
       return;
     }
 
-    const { error } = await state.db
-      .from('categories')
-      .insert({ name });
+    try {
+      const { error } = await state.db
+        .from('categories')
+        .insert({ name });
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (error) throw error;
+
+      input.value = '';
+
+      await loadCategories();
+      renderAdminCategories();
+
+      alert('Category added successfully.');
+
+    } catch (error) {
+      alert('Category error: ' + error.message);
     }
-
-    input.value = '';
-    alert('Category added.');
-    await loadCategories();
   }
 
+  // DELETE CATEGORY
   async function deleteCategory(categoryId) {
-    if (!isAdmin()) {
-      alert('You do not have permission.');
-      return;
-    }
+    if (!isAdmin()) return;
 
     if (!confirm('Delete this category?')) return;
 
-    const { error } = await state.db
-      .from('categories')
-      .delete()
-      .eq('id', categoryId);
+    try {
+      const { error } = await state.db
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
 
-    if (error) {
-      alert(error.message);
+      if (error) throw error;
+
+      await loadCategories();
+      renderAdminCategories();
+
+      alert('Category deleted successfully.');
+
+    } catch (error) {
+      alert('Category delete failed: ' + error.message);
+    }
+  }
+
+  // RENDER ADMIN CATEGORIES
+  function renderAdminCategories() {
+    const host = $('adminCategories');
+    if (!host) return;
+
+    if (!isAdmin()) {
+      host.innerHTML = '';
       return;
     }
 
-    alert('Category deleted.');
-    await loadCategories();
-  }
-
-  function renderAdminCategories() {
-    const container = $('adminCategories');
-    if (!container || !isAdmin()) return;
-
-    container.innerHTML = state.categories.map(category => `
+    host.innerHTML = state.categories.map(category => `
       <div class="admin-category-item">
+
         <span>${esc(category.name)}</span>
-        <button type="button" data-delete-category="${esc(category.id)}">
+
+        <button
+          type="button"
+          data-delete-category="${esc(category.id)}">
           Delete
         </button>
+
+      </div>
+    `).join('');
+      }
+    // LOAD ALL USERS - SUPER ADMIN ONLY
+  async function loadAllUsers() {
+    if (!isSuperAdmin() || !state.db) return;
+
+    const host = $('allUsers');
+    if (!host) return;
+
+    host.innerHTML = '<p>Loading users...</p>';
+
+    try {
+      const { data, error } = await state.db
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          username,
+          phone,
+          bio,
+          avatar_url,
+          role,
+          created_at
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      state.allUsers = data || [];
+
+      renderAllUsers();
+
+    } catch (error) {
+      console.error('User loading error:', error);
+
+      host.innerHTML = `
+        <p>Unable to load users: ${esc(error.message)}</p>
+      `;
+    }
+  }
+
+  // RENDER ALL USERS
+  function renderAllUsers() {
+    const host = $('allUsers');
+    if (!host || !isSuperAdmin()) return;
+
+    if (!state.allUsers.length) {
+      host.innerHTML = '<p>No users found.</p>';
+      return;
+    }
+
+    host.innerHTML = state.allUsers.map(user => `
+      <div class="admin-user-card">
+
+        <div class="admin-user-info">
+
+          <img
+            src="${esc(user.avatar_url || 'https://ui-avatars.com/api/?name=User')}"
+            alt="User"
+            width="55"
+            height="55"
+            style="border-radius:50%;object-fit:cover"
+          >
+
+          <h3>${esc(user.full_name || 'Unnamed User')}</h3>
+
+          <p>Username: ${esc(user.username || 'Not generated')}</p>
+
+          <p>Mobile: ${esc(user.phone || 'Not provided')}</p>
+
+          <p>Bio: ${esc(user.bio || 'No bio')}</p>
+
+          <p>Joined: ${formatDate(user.created_at)}</p>
+
+        </div>
+
+        <label>User Role</label>
+
+        <select id="role-${esc(user.id)}">
+          <option value="user" ${user.role === 'user' ? 'selected' : ''}>
+            User
+          </option>
+
+          <option value="author" ${user.role === 'author' ? 'selected' : ''}>
+            Author
+          </option>
+
+          <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>
+            Editor
+          </option>
+
+          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>
+            Admin
+          </option>
+        </select>
+
+        <button
+          type="button"
+          data-save-role="${esc(user.id)}">
+          Update Role
+        </button>
+
       </div>
     `).join('');
   }
 
-  // SUPER ADMIN: USER MANAGEMENT
-  async function loadAllUsers() {
-    if (!isSuperAdmin()) {
-      alert('Only Super Admin can access user management.');
-      return;
-    }
-
-    const container = $('allUsers');
-    if (container) {
-      container.innerHTML = '<p>Loading users...</p>';
-    }
-
-    const { data, error } = await state.db
-      .from('profiles')
-      .select('id, full_name, username, phone, bio, avatar_url, role, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Users loading error:', error);
-      if (container) {
-        container.innerHTML = '<p>Unable to load users. Check Supabase permissions.</p>';
-      }
-      return;
-    }
-
-    state.allUsers = data || [];
-    renderAllUsers();
-  }
-
-  function renderAllUsers() {
-    if (!isSuperAdmin()) return;
-
-    const container = $('allUsers');
-    if (!container) return;
-
-    if (!state.allUsers.length) {
-      container.innerHTML = '<p>No users found.</p>';
-      return;
-    }
-
-    container.innerHTML = state.allUsers.map(user => `
-      <article class="admin-user-card">
-        <img
-          src="${esc(user.avatar_url || 'https://placehold.co/80x80?text=User')}"
-          alt="Profile"
-          width="65"
-          height="65"
-          style="border-radius:50%;object-fit:cover;"
-        >
-
-        <h3>${esc(user.full_name || 'Unnamed User')}</h3>
-        <p>Username: @${esc(user.username || 'not-set')}</p>
-        <p>Phone: ${esc(user.phone || 'Not provided')}</p>
-        <p>Bio: ${esc(user.bio || 'No bio')}</p>
-        <p>Role: ${esc(user.role || 'user')}</p>
-        <p>Account created: ${formatDate(user.created_at)}</p>
-
-        <label for="role-${esc(user.id)}">Change role</label>
-        <select id="role-${esc(user.id)}">
-          <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
-          <option value="author" ${user.role === 'author' ? 'selected' : ''}>Author</option>
-          <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-        </select>
-
-        <button type="button" data-save-role="${esc(user.id)}">
-          Update Role
-        </button>
-      </article>
-    `).join('');
-  }
-
+  // UPDATE USER ROLE
   async function updateUserRole(userId) {
     if (!isSuperAdmin()) {
-      alert('Only Super Admin can change user roles.');
+      alert('Only Super Admin can update user roles.');
       return;
     }
 
@@ -1212,18 +1479,21 @@
       return;
     }
 
-    const { error } = await state.db
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId);
+    try {
+      const { error } = await state.db
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (error) throw error;
+
+      alert('User role updated.');
+
+      await loadAllUsers();
+
+    } catch (error) {
+      alert('Role update failed: ' + error.message);
     }
-
-    alert('User role updated.');
-    await loadAllUsers();
   }
 
   // PAGE ACCESS
@@ -1244,6 +1514,8 @@
       writerArea.hidden = !isWriter();
     }
 
+    renderWriteForm();
+
     if (isAdmin()) {
       renderAdminCategories();
     }
@@ -1261,6 +1533,7 @@
   function setupEvents() {
     document.addEventListener('click', async event => {
       const target = event.target.closest('button, [data-action]');
+
       if (!target) return;
 
       if (target.dataset.action === 'login') {
@@ -1313,6 +1586,7 @@
     });
 
     const categoryForm = $('categoryForm');
+
     if (categoryForm) {
       categoryForm.addEventListener('submit', event => {
         event.preventDefault();
@@ -1320,15 +1594,8 @@
       });
     }
 
-    const profileForm = $('profileForm');
-    if (profileForm) {
-      profileForm.addEventListener('submit', event => {
-        event.preventDefault();
-        saveProfile();
-      });
-    }
-
     const writeForm = $('writeForm');
+
     if (writeForm) {
       writeForm.addEventListener('submit', event => {
         event.preventDefault();
@@ -1336,76 +1603,27 @@
       });
     }
 
-    const photoInput = $('profilePhoto');
-    if (photoInput) {
-      photoInput.addEventListener('change', async () => {
-        if (photoInput.files?.[0]) {
-          await uploadProfilePhoto(photoInput.files[0]);
-        }
+    const searchInput = $('searchInput');
+
+    if (searchInput) {
+      let searchTimeout;
+
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+
+        searchTimeout = setTimeout(() => {
+          loadPosts();
+        }, 350);
       });
     }
-  }
-    // UPDATE POST
-  async function submitPost() {
-    if (!isWriter()) {
-      alert('You do not have permission to publish posts.');
-      return;
+
+    const categoryFilter = $('categoryFilter');
+
+    if (categoryFilter) {
+      categoryFilter.addEventListener('change', loadPosts);
     }
-
-    const form = $('writeForm');
-    const title = $('postTitle')?.value.trim();
-    const excerpt = $('postExcerpt')?.value.trim();
-    const content = $('postContent')?.value.trim();
-    const categoryId = $('postCategory')?.value || null;
-    const status = $('postStatus')?.value || 'draft';
-
-    if (!title || !content) {
-      alert('Please enter post title and content.');
-      return;
-    }
-
-    const postData = {
-      title,
-      excerpt,
-      content,
-      category_id: categoryId,
-      status,
-      author_id: state.session.user.id,
-      author_name: getUserName()
-    };
-
-    const editingId = form?.dataset.editingId;
-    let result;
-
-    if (editingId) {
-      result = await state.db
-        .from('posts')
-        .update(postData)
-        .eq('id', editingId)
-        .eq('author_id', state.session.user.id);
-    } else {
-      result = await state.db
-        .from('posts')
-        .insert(postData);
-    }
-
-    if (result.error) {
-      alert(result.error.message);
-      return;
-    }
-
-    if (form) {
-      form.reset();
-      delete form.dataset.editingId;
-    }
-
-    alert(editingId ? 'Post updated successfully.' : 'Post submitted successfully.');
-
-    await loadPosts();
-    await loadUserPosts();
-  }
-
-  // AUTH STATE
+             }
+    // AUTH STATE
   async function handleAuthState(session) {
     state.session = session;
 
@@ -1413,6 +1631,8 @@
       await loadProfile();
     } else {
       state.profile = null;
+      state.userPosts = [];
+      state.allUsers = [];
     }
 
     renderAuth();
@@ -1421,47 +1641,61 @@
 
   // INITIALIZE APPLICATION
   async function init() {
+    if (state.initialized) return;
+
+    state.initialized = true;
+
     setupEvents();
 
-    const connected = await initializeSupabase();
+    // Show login/signup buttons immediately
+    renderAuth();
+
+    const connected = initializeSupabase();
 
     if (!connected || !state.db) {
-      setStatus('Supabase connection is not configured.');
+      setStatus('Supabase connection is not configured. Check config.js.');
+      console.error('Please verify SUPABASE_URL and SUPABASE_ANON_KEY.');
       return;
     }
 
-    const { data, error } = await state.db.auth.getSession();
+    try {
+      const { data, error } = await state.db.auth.getSession();
 
-    if (error) {
-      console.error('Session error:', error);
-      setStatus('Unable to check login session.');
-      return;
+      if (error) throw error;
+
+      await handleAuthState(data.session);
+
+      state.db.auth.onAuthStateChange((_event, session) => {
+        setTimeout(() => {
+          handleAuthState(session).catch(error => {
+            console.error('Authentication state error:', error);
+          });
+        }, 0);
+      });
+
+      await Promise.all([
+        loadSettings(),
+        loadCategories(),
+        loadPosts()
+      ]);
+
+      setupPageAccess();
+
+      const year = $('year');
+
+      if (year) {
+        year.textContent = new Date().getFullYear();
+      }
+
+      setStatus('');
+
+      console.log('RK BlogSphere initialized successfully.');
+
+    } catch (error) {
+      console.error('Application initialization error:', error);
+
+      setStatus('Unable to initialize application: ' + error.message);
     }
-
-    await handleAuthState(data.session);
-
-    state.db.auth.onAuthStateChange(async (_event, session) => {
-      state.session = session;
-
-      setTimeout(async () => {
-        await handleAuthState(session);
-      }, 0);
-    });
-
-    await Promise.all([
-      loadSettings(),
-      loadCategories(),
-      loadPosts()
-    ]);
-
-    setupPageAccess();
-
-    const year = $('year');
-    if (year) {
-      year.textContent = new Date().getFullYear();
-    }
-
-    setStatus('');
   }
 
   // GLOBAL FUNCTIONS FOR HTML BUTTONS
@@ -1479,7 +1713,7 @@
     submitPost
   };
 
-  // START APP
+  // START APPLICATION
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
@@ -1487,4 +1721,3 @@
   }
 
 })();
-  
