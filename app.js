@@ -4,7 +4,6 @@
 
   const $ = (id) => document.getElementById(id);
   const cfg = window.BLOGSPHERE_CONFIG || {};
-
   const state = {
     db: null,
     session: null,
@@ -14,31 +13,25 @@
     settings: {}
   };
 
-  const requiredIds = [
-    'year', 'feedStatus', 'posts', 'authArea', 'modal',
-    'modalContent', 'closeModal', 'categoryFilter',
-    'postCategory', 'search', 'refreshBtn', 'writePrompt',
-    'postForm', 'postTitle', 'postExcerpt', 'postContent',
-    'coverFile', 'postMessage', 'dashboardContent'
-  ];
+  const page = location.pathname.split('/').pop() || 'index.html';
+  const requiredIds = page === 'index.html'
+    ? ['year', 'feedStatus', 'posts', 'authArea', 'modal', 'modalContent', 'closeModal', 'categoryFilter', 'search', 'refreshBtn']
+    : page === 'write.html'
+    ? ['authArea', 'modal', 'modalContent', 'closeModal', 'writePrompt', 'postForm', 'postTitle', 'postExcerpt', 'postCategory', 'postContent', 'coverFile', 'postMessage']
+    : page === 'dashboard.html'
+    ? ['authArea', 'modal', 'modalContent', 'closeModal', 'dashboardContent']
+    : ['authArea'];
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[char]);
 
   function withTimeout(promise, label, milliseconds = 15000) {
     let timer;
     const timeout = new Promise((_, reject) => {
-      timer = window.setTimeout(() => reject(
-        new Error(`${label} timed out. Check internet and Supabase settings.`)
-      ), milliseconds);
+      timer = window.setTimeout(() => reject(new Error(`${label} timed out after ${milliseconds / 1000} seconds. Check your internet connection and Supabase settings.`)), milliseconds);
     });
-    return Promise.race([Promise.resolve(promise), timeout])
-      .finally(() => window.clearTimeout(timer));
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => window.clearTimeout(timer));
   }
 
   function setStatus(message, isError = false) {
@@ -59,21 +52,19 @@
   }
 
   function isWriter() {
-    return !!state.profile &&
-      ['author', 'editor', 'admin', 'super_admin'].includes(state.profile.role);
+    return !!state.profile && ['author', 'editor', 'admin', 'super_admin'].includes(state.profile.role);
   }
 
   function isAdmin() {
-    return !!state.profile &&
-      ['editor', 'admin', 'super_admin'].includes(state.profile.role);
+    return !!state.profile && ['editor', 'admin', 'super_admin'].includes(state.profile.role);
   }
 
   function settingText(value) {
-    if (value == null) return '';
+    if (value === null || value === undefined) return '';
     if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value);
-        return typeof parsed === 'string' ? parsed : value;
+        return typeof parsed === 'string' ? parsed : String(value);
       } catch (_) {
         return value;
       }
@@ -87,22 +78,19 @@
     document.title = siteName;
 
     const tagline = settingText(s.site_tagline);
-    const brandText = document.querySelector('.rkb-brand-text');
-    if (brandText) brandText.textContent = siteName;
-
-    const footer = document.querySelector('footer p');
-    if (footer) {
-      footer.textContent = `© ${new Date().getFullYear()} ${siteName} · Made for readers and writers`;
+    if (tagline) {
+      const brandText = document.querySelector('.rkb-brand-text');
+      if (brandText) brandText.textContent = siteName;
+      const footer = document.querySelector('footer p');
+      if (footer) footer.textContent = `© ${new Date().getFullYear()} ${siteName} · Made for readers and writers`;
     }
 
     const heroTitle = settingText(s.hero_title);
     const heroDescription = settingText(s.hero_description);
     const h1 = document.querySelector('.hero h1');
     const heroParagraph = document.querySelector('.hero > div > p:not(.eyebrow)');
-
     if (heroTitle && h1) h1.textContent = heroTitle;
     if (heroDescription && heroParagraph) heroParagraph.textContent = heroDescription;
-
     if (tagline) {
       const eyebrow = document.querySelector('.hero .eyebrow');
       if (eyebrow) eyebrow.textContent = tagline;
@@ -114,7 +102,6 @@
       logo_login: '.rkb-auth-logo',
       logo_footer: '.rkb-footer-logo'
     };
-
     Object.entries(logoMap).forEach(([key, selector]) => {
       const image = document.querySelector(selector);
       const url = settingText(s[key]);
@@ -124,24 +111,16 @@
 
   async function loadSettings() {
     try {
-      const { data, error } = await withTimeout(
-        state.db.from('site_settings').select('key,value'),
-        'Loading website settings'
-      );
-
+      const { data, error } = await withTimeout(state.db.from('site_settings').select('key,value'), 'Loading website settings');
       if (error) {
-        console.warn('Settings error:', error.message);
+        console.warn('Website settings could not be loaded:', error.message);
         return;
       }
-
       state.settings = {};
-      (data || []).forEach((row) => {
-        state.settings[row.key] = row.value;
-      });
-
+      (data || []).forEach((row) => { state.settings[row.key] = row.value; });
       applySettings();
     } catch (error) {
-      console.warn('Settings loading error:', error);
+      console.warn('Website settings error:', error);
     }
   }
 
@@ -150,9 +129,7 @@
       p_key: key,
       p_value: String(value)
     });
-
     if (error) throw error;
-
     state.settings[key] = value;
     applySettings();
   }
@@ -162,17 +139,8 @@
     if (!area) return;
 
     if (state.session?.user) {
-      const label = state.profile?.username ||
-        state.profile?.full_name ||
-        state.session.user.email ||
-        'Account';
-
-      area.innerHTML = `
-        <span class="postmeta">${esc(label)}
-        ${state.profile?.role ? ' · ' + esc(state.profile.role) : ''}</span>
-        <button class="smallbtn" id="logoutBtn" type="button">Logout</button>
-      `;
-
+      const label = state.profile?.username || state.profile?.full_name || state.session.user.email || 'Account';
+      area.innerHTML = `<span class="postmeta">${esc(label)}${state.profile?.role ? ` · ${esc(state.profile.role)}` : ''}</span> <button class="smallbtn" id="logoutBtn" type="button">Logout</button>`;
       $('logoutBtn').onclick = async () => {
         const { error } = await state.db.auth.signOut();
         if (error) alert(error.message);
@@ -180,12 +148,7 @@
       return;
     }
 
-    area.innerHTML = `
-      <button class="btn" id="loginBtn" type="button">
-        Login / Sign up
-      </button>
-    `;
-
+    area.innerHTML = '<button class="btn" id="loginBtn" type="button">Login / Sign up</button>';
     $('loginBtn').onclick = openAuthModal;
   }
 
@@ -194,39 +157,23 @@
       <h2>Login / Sign up</h2>
       <form id="authForm" class="adminlist">
         <label>Email</label>
-        <input id="authEmail" type="email"
-          autocomplete="email" required
-          placeholder="Enter your email">
-
+        <input id="authEmail" type="email" autocomplete="email" required placeholder="Enter your email">
         <label>Password</label>
-        <input id="authPassword" type="password"
-          autocomplete="current-password"
-          minlength="6" required
-          placeholder="At least 6 characters">
-
+        <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters">
         <div class="inlineform">
           <button class="btn" type="submit">Login</button>
-          <button class="btn secondary" id="signupBtn" type="button">
-            Create account
-          </button>
+          <button class="btn secondary" id="signupBtn" type="button">Create account</button>
         </div>
-
         <p id="authMsg" class="muted" aria-live="polite"></p>
       </form>
     `);
 
     $('authForm').onsubmit = async (event) => {
       event.preventDefault();
-
       const email = $('authEmail').value.trim();
       const password = $('authPassword').value;
       $('authMsg').textContent = 'Signing in…';
-
-      const { error } = await state.db.auth.signInWithPassword({
-        email,
-        password
-      });
-
+      const { error } = await state.db.auth.signInWithPassword({ email, password });
       if (error) {
         $('authMsg').textContent = error.message;
       } else {
@@ -238,42 +185,29 @@
     $('signupBtn').onclick = async () => {
       const email = $('authEmail').value.trim();
       const password = $('authPassword').value;
-
       if (!email || password.length < 6) {
-        $('authMsg').textContent =
-          'Enter a valid email and password of at least 6 characters.';
+        $('authMsg').textContent = 'Enter a valid email and a password with at least 6 characters.';
         return;
       }
-
       $('authMsg').textContent = 'Creating account…';
-
-      const { error } = await state.db.auth.signUp({
-        email,
-        password
-      });
-
+      const { error } = await state.db.auth.signUp({ email, password });
       $('authMsg').textContent = error
         ? error.message
-        : 'Account request submitted. Check email if confirmation is enabled.';
+        : 'Account request submitted. Check your email if email confirmation is enabled.';
     };
   }
 
   async function loadProfile() {
     state.profile = null;
-
     if (state.session?.user) {
-      const { data, error } = await withTimeout(
-        state.db.from('profiles')
-          .select('*')
-          .eq('id', state.session.user.id)
-          .maybeSingle(),
-        'Loading your profile'
-      );
-
-      if (error) console.warn('Profile error:', error.message);
+      const { data, error } = await withTimeout(state.db
+        .from('profiles')
+        .select('*')
+        .eq('id', state.session.user.id)
+        .maybeSingle(), 'Loading your profile');
+      if (error) console.warn('Profile load error:', error.message);
       state.profile = data || null;
     }
-
     renderAuth();
     renderWriteForm();
     await renderDashboard();
@@ -281,915 +215,582 @@
 
   function renderWriteForm() {
     const allowed = isWriter();
-    $('writePrompt').hidden = allowed;
-    $('postForm').hidden = !allowed;
+    const prompt = $('writePrompt');
+    const form = $('postForm');
+    if (prompt) prompt.hidden = allowed;
+    if (form) form.hidden = !allowed;
+        if (!allowed || !form) return;
 
-    if (allowed) $('writePrompt').textContent = '';
+    const title = $('postTitle');
+    const excerpt = $('postExcerpt');
+    const category = $('postCategory');
+    if (title) title.placeholder = 'Write your article title';
+    if (excerpt) excerpt.placeholder = 'Short description of your article';
+    if (category) populateCategorySelect(category);
+  }
+
+  function populateCategorySelect(select) {
+    if (!select) return;
+    const selected = select.value;
+    select.innerHTML = '<option value="">Select category</option>' +
+      state.categories.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    if (selected) select.value = selected;
   }
 
   async function loadCategories() {
-    const { data, error } = await withTimeout(
-      state.db.from('categories')
-        .select('id,name,slug')
-        .order('name'),
-      'Loading categories'
-    );
+    try {
+      const { data, error } = await withTimeout(state.db
+        .from('categories')
+        .select('*')
+        .order('name'), 'Loading categories');
+      if (error) throw error;
+      state.categories = data || [];
+      const filter = $('categoryFilter');
+      const select = $('postCategory');
+      if (filter) {
+        filter.innerHTML = '<option value="">All categories</option>' +
+          state.categories.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+      }
+      if (select) populateCategorySelect(select);
+    } catch (error) {
+      console.warn('Category error:', error);
+    }
+  }
 
-    if (error) {
-      console.warn('Categories error:', error.message);
+  function getCategoryName(id) {
+    return state.categories.find(c => c.id === id)?.name || 'General';
+  }
+
+  function getImage(post) {
+    return post.cover_image || post.image_url || '';
+  }
+
+  function renderPosts(posts) {
+    const host = $('posts');
+    if (!host) return;
+    if (!posts.length) {
+      host.innerHTML = '<div class="empty"><h3>No posts found</h3><p>Try another search or category.</p></div>';
       return;
     }
 
-    state.categories = data || [];
+    host.innerHTML = posts.map(post => `
+      <article class="postcard">
+        ${getImage(post) ? `<img class="postcover" src="${esc(getImage(post))}" alt="${esc(post.title)}" loading="lazy">` : ''}
+        <div class="postbody">
+          <span class="categorytag">${esc(getCategoryName(post.category_id))}</span>
+          <h2>${esc(post.title)}</h2>
+          <p>${esc(post.excerpt || '')}</p>
+          <div class="postmeta">
+            ${esc(post.author_name || 'RK BlogSphere')}
+            · ${new Date(post.created_at).toLocaleDateString()}
+          </div>
+          <div class="inlineform">
+            <button class="btn smallbtn readBtn" data-id="${esc(post.id)}" type="button">Read more</button>
+            <button class="smallbtn likeBtn" data-id="${esc(post.id)}" type="button">♥ ${Number(post.likes_count || 0)}</button>
+          </div>
+        </div>
+      </article>
+    `).join('');
 
-    const options = state.categories.map((category) =>
-      `<option value="${esc(category.id)}">${esc(category.name)}</option>`
-    ).join('');
-
-    $('categoryFilter').innerHTML =
-      '<option value="">All categories</option>' + options;
-
-    $('postCategory').innerHTML =
-      '<option value="">Choose category</option>' + options;
-  }
-
-  function categoryName(id) {
-    return state.categories.find((item) => item.id === id)?.name || 'Article';
+    host.querySelectorAll('.readBtn').forEach(btn => {
+      btn.onclick = () => openPost(btn.dataset.id);
+    });
+    host.querySelectorAll('.likeBtn').forEach(btn => {
+      btn.onclick = () => likePost(btn.dataset.id);
+    });
   }
 
   async function loadPosts() {
+    const host = $('posts');
+    if (!host) return;
+
     setStatus('Loading articles…');
-    $('posts').innerHTML =
-      '<div class="message">Connecting to RK BlogSphere…</div>';
-
     try {
-      const { data, error } = await withTimeout(
-        state.db.from('posts')
-          .select('id,title,slug,excerpt,content,cover_image,category_id,status,featured,views,created_at,published_at,author_id')
-          .eq('status', 'published')
-          .order('featured', { ascending: false })
-          .order('published_at', { ascending: false }),
-        'Loading published articles'
-      );
+      let query = state.db.from('posts').select('*').eq('status', 'published').order('created_at', { ascending: false });
+      const search = $('search')?.value?.trim();
+      const category = $('categoryFilter')?.value;
 
+      if (category) query = query.eq('category_id', category);
+      if (search) query = query.ilike('title', `%${search}%`);
+
+      const { data, error } = await withTimeout(query, 'Loading articles');
       if (error) throw error;
 
       state.posts = data || [];
-      renderPostList();
+      renderPosts(state.posts);
+      setStatus(`${state.posts.length} article(s) available`);
     } catch (error) {
-      console.error('Post feed error:', error);
-      setStatus(`Could not load articles: ${error.message}`, true);
-      $('posts').innerHTML = `
-        <div class="message">
-          Articles could not be loaded.
-          Check Supabase connection and permissions.
-        </div>
-      `;
+      setStatus('Could not load articles: ' + error.message, true);
+      host.innerHTML = `<div class="empty"><h3>Unable to load articles</h3><p>${esc(error.message)}</p></div>`;
     }
   }
 
-  function renderPostList() {
-    const searchTerm = $('search').value.trim().toLowerCase();
-    const selectedCategory = $('categoryFilter').value;
-
-    const filtered = state.posts.filter((post) => {
-      const text = `${post.title || ''} ${post.excerpt || ''} ${post.content || ''}`.toLowerCase();
-
-      return (!selectedCategory || post.category_id === selectedCategory) &&
-        (!searchTerm || text.includes(searchTerm));
-    });
-
-    setStatus(`${filtered.length} article(s)`);
-
-    $('posts').innerHTML = filtered.length
-      ? filtered.map((post) => `
-        <article class="postcard">
-          ${post.cover_image
-            ? `<img src="${esc(post.cover_image)}" alt="${esc(post.title)}" loading="lazy">`
-            : '<div style="height:190px;background:#dce5e1;display:grid;place-items:center;font-size:2rem;color:#146c60">✦</div>'}
-
-          <div class="postbody">
-            <span class="tag">${esc(categoryName(post.category_id))}${post.featured ? ' · FEATURED' : ''}</span>
-            <h3>${esc(post.title)}</h3>
-            <p>${esc(post.excerpt || '')}</p>
-            <span class="postmeta">
-              ${new Date(post.published_at || post.created_at).toLocaleDateString()}
-              · ${Number(post.views || 0)} views
-            </span>
-
-            <div class="postactions">
-              <button type="button" data-read="${esc(post.id)}">Read article</button>
-              ${state.session
-                ? `<button type="button" data-save="${esc(post.id)}">Bookmark</button>
-                   <button type="button" data-like="${esc(post.id)}">Like</button>`
-                : ''}
-            </div>
-          </div>
-        </article>
-      `).join('')
-      : '<div class="message">No published articles found yet.</div>';
-
-    $('posts').querySelectorAll('[data-read]').forEach((button) => {
-      button.onclick = () => openPost(button.dataset.read);
-    });
-
-    $('posts').querySelectorAll('[data-save]').forEach((button) => {
-      button.onclick = () => saveBookmark(button.dataset.save);
-    });
-
-    $('posts').querySelectorAll('[data-like]').forEach((button) => {
-      button.onclick = () => likePost(button.dataset.like);
-    });
-  }
-
-  async function openPost(id, suppliedPost = null) {
-    const post = suppliedPost || state.posts.find((item) => item.id === id);
-
-    if (!post) {
-      alert('This article is not available.');
-      return;
-    }
-
-    try {
-      await state.db.rpc('increment_post_view', {
-        post_id_input: id
-      });
-    } catch (_) {}
-
-    const { data: comments, error } = await state.db.from('comments')
-      .select('content,author_id,created_at')
-      .eq('post_id', id)
-      .eq('status', 'approved')
-      .order('created_at');
+  async function openPost(id) {
+    const post = state.posts.find(p => String(p.id) === String(id));
+    if (!post) return;
 
     showModal(`
-      <h2>${esc(post.title)}</h2>
-
-      ${post.cover_image
-        ? `<img style="width:100%;border-radius:12px"
-           src="${esc(post.cover_image)}" alt="">`
-        : ''}
-
-      <p class="postmeta">
-        ${new Date(post.published_at || post.created_at).toLocaleDateString()}
-      </p>
-
-      <div class="articlecontent" style="white-space:pre-wrap">
-        ${esc(post.content)}
-      </div>
-
-      <hr>
-      <h3>Comments</h3>
-
-      <div>
-        ${error
-          ? `<p class="muted">${esc(error.message)}</p>`
-          : (comments || []).map((comment) => `
-              <p>${esc(comment.content)}
-                <small class="postmeta">
-                  ${new Date(comment.created_at).toLocaleDateString()}
-                </small>
-              </p>
-            `).join('') || 'No comments yet.'}
-      </div>
-
-      ${state.session
-        ? `
-          <form id="commentForm">
-            <textarea id="commentText" rows="3"
-              placeholder="Add a comment…" required></textarea>
-            <button class="btn" type="submit">Submit comment</button>
-            <p class="postmeta">Comments may require moderation.</p>
-            <p id="commentMessage" class="muted"></p>
-          </form>
-        `
-        : '<p class="postmeta">Sign in to comment.</p>'}
+      <article class="articleview">
+        ${getImage(post) ? `<img class="postcover" src="${esc(getImage(post))}" alt="${esc(post.title)}">` : ''}
+        <span class="categorytag">${esc(getCategoryName(post.category_id))}</span>
+        <h1>${esc(post.title)}</h1>
+        <p class="postmeta">${esc(post.author_name || 'RK BlogSphere')} · ${new Date(post.created_at).toLocaleDateString()}</p>
+        <p>${esc(post.excerpt || '')}</p>
+        <div class="articlecontent">${esc(post.content || '').replace(/\n/g, '<br>')}</div>
+        <div class="inlineform">
+          <button class="btn" id="modalLikeBtn" type="button">♥ Like</button>
+          <button class="btn secondary" id="bookmarkBtn" type="button">Bookmark</button>
+        </div>
+        <h3>Comments</h3>
+        <div id="commentsList">Loading comments…</div>
+        <form id="commentForm" class="adminlist">
+          <textarea id="commentText" rows="3" placeholder="Write a comment" required></textarea>
+          <button class="btn" type="submit">Submit comment</button>
+          <p id="commentMessage" class="muted"></p>
+        </form>
+      </article>
     `);
 
-    if ($('commentForm')) {
-      $('commentForm').onsubmit = async (event) => {
-        event.preventDefault();
-
-        const content = $('commentText').value.trim();
-
-        const { error: insertError } = await state.db.from('comments').insert({
-          post_id: id,
-          author_id: state.session.user.id,
-          content,
-          status: 'pending'
-        });
-
-        $('commentMessage').textContent = insertError
-          ? insertError.message
-          : 'Comment submitted for review.';
-
-        if (!insertError) $('commentForm').reset();
-      };
-    }
-      }
-    async function saveBookmark(postId) {
-    const { error } = await state.db.from('bookmarks').insert({
-      post_id: postId,
-      user_id: state.session.user.id
-    });
-
-    alert(error ? error.message : 'Article bookmarked.');
-  }
-
-  async function likePost(postId) {
-    const { error } = await state.db.from('likes').insert({
-      post_id: postId,
-      user_id: state.session.user.id
-    });
-
-    alert(error ? error.message : 'Article liked.');
-  }
-
-  async function moderatePost(postId, status) {
-    const { data, error } = await state.db.rpc('admin_moderate_post', {
-      p_post_id: postId,
-      p_status: status
-    });
-
-    if (error) {
-      alert(`Moderation failed: ${error.message}`);
-      return;
-    }
-
-    alert(data || 'Article status updated.');
-    await loadPosts();
-    await renderDashboard();
-  }
-
-  async function deletePost(postId) {
-    if (!confirm('Are you sure you want to permanently delete this article?')) {
-      return;
-    }
-
-    const { data, error } = await state.db.rpc('admin_delete_post', {
-      p_post_id: postId
-    });
-
-    if (error) {
-      alert(`Delete failed: ${error.message}`);
-      return;
-    }
-
-    alert(data || 'Article deleted.');
-    await loadPosts();
-    await renderDashboard();
-  }
-
-  async function renderDashboard() {
-    const host = $('dashboardContent');
-
-    if (!state.session?.user) {
-      host.textContent = 'Sign in to view your dashboard.';
-      return;
-    }
-
-    const role = state.profile?.role || 'user';
-
-    host.innerHTML = `
-      <p>
-        Signed in as <b>${esc(state.session.user.email)}</b>
-        · Role: <b>${esc(role)}</b>
-      </p>
-
-      ${isAdmin() ? `
-        <img class="rkb-admin-logo"
-          src="${esc(settingText(state.settings.logo_admin) || 'rk-blogspheere-logo.png')}"
-          alt="RK BlogSphere Admin"
-          style="display:block;max-width:220px;max-height:90px;object-fit:contain;margin:12px auto">
-      ` : ''}
-
-      <h3>Your articles</h3>
-      <div id="myPosts" class="adminlist">Loading…</div>
-
-      ${isAdmin() ? `
-        <hr>
-        <h3>Moderation queue</h3>
-        <div id="moderation" class="adminlist">Loading…</div>
-
-        <hr>
-        <h3>Manage categories</h3>
-        <form id="catForm" class="inlineform">
-          <input id="catName" placeholder="New category" required>
-          <button class="btn" type="submit">Add</button>
-        </form>
-        <p id="catMsg" class="muted"></p>
-
-        <hr>
-        <h3>Manage users</h3>
-        <div id="usersList" class="adminlist">Loading…</div>
-
-        <hr>
-        <h3>Website branding settings</h3>
-        <form id="brandingForm" class="adminlist">
-          <label>Website name</label>
-          <input id="settingSiteName" maxlength="100"
-            placeholder="RK BlogSphere">
-
-          <label>Website tagline</label>
-          <input id="settingTagline" maxlength="180"
-            placeholder="STORIES · IDEAS · KNOWLEDGE">
-
-          <label>Home page heading</label>
-          <input id="settingHeroTitle" maxlength="180"
-            placeholder="Ideas worth sharing.">
-
-          <label>Home page description</label>
-          <textarea id="settingHeroDescription" rows="3"
-            maxlength="500" placeholder="Describe your website"></textarea>
-
-          <button class="btn" type="submit">Save website text</button>
-          <p id="brandingMsg" class="muted"></p>
-        </form>
-
-        <div id="logoSettings" class="adminlist"></div>
-      ` : `
-        <p class="muted">
-          Your account can read articles. An administrator
-          can grant author or admin permissions.
-        </p>
-      `}
-    `;
-
-    await loadMyPosts();
-
-    if (isAdmin()) {
-      await loadAdminSections();
-    }
-  }
-
-  async function loadMyPosts() {
-    const host = $('myPosts');
-    if (!host) return;
-
-    const { data, error } = await withTimeout(
-      state.db.from('posts')
-        .select('id,title,status,created_at,content,excerpt,cover_image,published_at')
-        .eq('author_id', state.session.user.id)
-        .order('created_at', { ascending: false }),
-      'Loading your articles'
-    );
-
-    if (error) {
-      host.textContent = error.message;
-      return;
-    }
-
-    host.innerHTML = (data || []).length
-      ? data.map((post) => `
-        <div class="adminrow">
-          <div>
-            <b>${esc(post.title)}</b>
-            <div class="postmeta">
-              ${esc(post.status)} ·
-              ${new Date(post.created_at).toLocaleDateString()}
-            </div>
-          </div>
-          <button type="button" class="smallbtn"
-            data-own="${esc(post.id)}">View</button>
-        </div>
-      `).join('')
-      : 'No articles yet.';
-
-    host.querySelectorAll('[data-own]').forEach((button) => {
-      button.onclick = () => {
-        const post = (data || []).find(
-          (item) => item.id === button.dataset.own
-        );
-
-        if (post) openPost(post.id, post);
-      };
-    });
-  }
-
-  async function loadAdminSections() {
-    await Promise.all([
-      loadModerationQueue(),
-      loadUsers(),
-      renderBrandingSettings()
-    ]);
-
-    const form = $('catForm');
-
-    if (form) {
-      form.onsubmit = async (event) => {
-        event.preventDefault();
-
-        const name = $('catName').value.trim();
-
-        const slug = name.toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '') ||
-          `category-${Date.now()}`;
-
-        const { error } = await state.db.from('categories')
-          .insert({ name, slug });
-
-        $('catMsg').textContent = error
-          ? error.message
-          : 'Category added successfully.';
-
-        if (!error) {
-          form.reset();
-          await loadCategories();
-        }
-      };
-    }
-  }
-
-  async function loadModerationQueue() {
-    const host = $('moderation');
-
-    const { data, error } = await withTimeout(
-      state.db.from('posts')
-        .select('id,title,status,author_id,created_at')
-        .neq('status', 'published')
-        .order('created_at', { ascending: false }),
-      'Loading moderation queue'
-    );
-
-    if (error) {
-      host.textContent = error.message;
-      return;
-    }
-
-    host.innerHTML = (data || []).length
-      ? data.map((post) => `
-        <div class="adminrow">
-          <div>
-            <b>${esc(post.title)}</b>
-            <div class="postmeta">
-              ${esc(post.status)} · ${esc(post.author_id)}
-            </div>
-          </div>
-
-          <div class="inlineform">
-            <button class="smallbtn" type="button"
-              data-publish="${esc(post.id)}">Publish</button>
-
-            <button class="smallbtn" type="button"
-              data-reject="${esc(post.id)}">Reject</button>
-
-            <button class="smallbtn" type="button"
-              data-delete="${esc(post.id)}">Delete</button>
-          </div>
-        </div>
-      `).join('')
-      : 'No pending or unpublished articles.';
-
-    host.querySelectorAll('[data-publish]').forEach((button) => {
-      button.onclick = () =>
-        moderatePost(button.dataset.publish, 'published');
-    });
-
-    host.querySelectorAll('[data-reject]').forEach((button) => {
-      button.onclick = () =>
-        moderatePost(button.dataset.reject, 'rejected');
-    });
-
-    host.querySelectorAll('[data-delete]').forEach((button) => {
-      button.onclick = () =>
-        deletePost(button.dataset.delete);
-    });
-  }
-
-  async function loadUsers() {
-    const host = $('usersList');
-
-    const { data, error } = await withTimeout(
-      state.db.from('profiles')
-        .select('id,username,full_name,role'),
-      'Loading user accounts'
-    );
-
-    if (error) {
-      host.textContent = error.message;
-      return;
-    }
-
-    const allowedRoles = state.profile?.role === 'super_admin'
-      ? ['user', 'author', 'editor', 'admin', 'super_admin']
-      : state.profile?.role === 'admin'
-        ? ['user', 'author', 'editor', 'admin']
-        : ['user', 'author'];
-
-    host.innerHTML = (data || []).length
-      ? data.map((user) => `
-        <div class="adminrow">
-          <div>
-            <b>${esc(user.username || user.full_name || user.id)}</b>
-            <div class="postmeta">${esc(user.role || 'user')}</div>
-          </div>
-
-          <select data-role-user="${esc(user.id)}"
-            aria-label="Change user role">
-            ${allowedRoles.map((role) => `
-              <option value="${role}"
-                ${role === user.role ? 'selected' : ''}>
-                ${role}
-              </option>
-            `).join('')}
-          </select>
-        </div>
-      `).join('')
-      : 'No user profiles found.';
-
-    host.querySelectorAll('[data-role-user]').forEach((select) => {
-      select.onchange = async () => {
-        const { error: roleError } = await state.db.rpc(
-          'admin_set_user_role',
-          {
-            p_user_id: select.dataset.roleUser,
-            p_role: select.value
-          }
-        );
-
-        if (roleError) {
-          alert(`Role update failed: ${roleError.message}`);
-          await loadUsers();
-        } else {
-          alert('User role updated.');
-          await loadUsers();
-        }
-      };
-    });
-  }
-
-  function renderBrandingSettings() {
-    const fields = {
-      settingSiteName: 'site_name',
-      settingTagline: 'site_tagline',
-      settingHeroTitle: 'hero_title',
-      settingHeroDescription: 'hero_description'
-    };
-
-    Object.entries(fields).forEach(([id, key]) => {
-      const input = $(id);
-      if (input) {
-        input.value = settingText(state.settings[key]);
-      }
-    });
-
-    const logoLabels = [
-      ['logo_header', 'Header logo'],
-      ['logo_home', 'Home page logo'],
-      ['logo_login', 'Login logo'],
-      ['logo_admin', 'Admin dashboard logo'],
-      ['logo_footer', 'Footer logo']
-    ];
-
-    $('logoSettings').innerHTML = logoLabels.map(([key, label]) => `
-      <label>
-        <b>${label}</b>
-        <input type="file" accept="image/png,image/jpeg,image/webp"
-          data-logo-upload="${key}">
-      </label>
-
-      ${settingText(state.settings[key])
-        ? `<img src="${esc(settingText(state.settings[key]))}"
-          alt="${label}"
-          style="max-width:180px;max-height:70px;object-fit:contain">`
-        : ''}
-    `).join('');
-
-    $('brandingForm').onsubmit = async (event) => {
+    $('modalLikeBtn').onclick = () => likePost(id);
+    $('bookmarkBtn').onclick = () => bookmarkPost(id);
+    loadComments(id);
+
+    $('commentForm').onsubmit = async (event) => {
       event.preventDefault();
-
-      const message = $('brandingMsg');
-      message.textContent = 'Saving…';
-
-      try {
-        for (const [id, key] of Object.entries(fields)) {
-          await saveSetting(key, $(id).value.trim());
-        }
-
-        message.textContent = 'Website text settings saved.';
-      } catch (error) {
-        message.textContent =
-          error.message || 'Could not save settings.';
+      if (!state.session?.user) {
+        $('commentMessage').textContent = 'Please login first.';
+        return;
+      }
+      const content = $('commentText').value.trim();
+      if (!content) return;
+      const { error } = await state.db.from('comments').insert({
+        post_id: id,
+        user_id: state.session.user.id,
+        content
+      });
+      $('commentMessage').textContent = error ? error.message : 'Comment submitted.';
+      if (!error) {
+        $('commentText').value = '';
+        loadComments(id);
       }
     };
-
-    $('logoSettings')
-      .querySelectorAll('[data-logo-upload]')
-      .forEach((input) => {
-        input.onchange = () => uploadLogo(
-          input.dataset.logoUpload,
-          input.files?.[0]
-        );
-      });
   }
-    // -------------------------------
-  // LOGO UPLOAD
-  // -------------------------------
 
-  async function uploadLogo(key, file) {
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Logo must be 5 MB or smaller.');
-      return;
-    }
-
-    const extension = (
-      file.name.split('.').pop() || 'png'
-    ).toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
-
-    const path = `site-logos/${key}-${Date.now()}.${extension}`;
-
-    const { error: uploadError } = await state.db.storage
-      .from('blog-images')
-      .upload(path, file, {
-        upsert: false,
-        contentType: file.type
-      });
-
-    if (uploadError) {
-      alert(
-        `Logo upload failed: ${uploadError.message}. ` +
-        'Check the blog-images bucket and its upload policy.'
-      );
-      return;
-    }
-
-    const { data } = state.db.storage
-      .from('blog-images')
-      .getPublicUrl(path);
-
+  async function loadComments(id) {
+    const host = $('commentsList');
+    if (!host) return;
     try {
-      await saveSetting(key, data.publicUrl);
-
-      alert('Logo uploaded and saved.');
-
-      await loadSettings();
-      await renderDashboard();
+      const { data, error } = await state.db.from('comments')
+        .select('*')
+        .eq('post_id', id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      host.innerHTML = (data || []).map(c => `
+        <div class="comment">
+          <p>${esc(c.content)}</p>
+          <small>${new Date(c.created_at).toLocaleDateString()}</small>
+        </div>
+      `).join('') || '<p>No comments yet.</p>';
     } catch (error) {
-      alert(
-        `Logo uploaded, but setting could not be saved: ${error.message}`
-      );
+      host.textContent = 'Comments could not be loaded.';
     }
   }
 
-  // -------------------------------
-  // CREATE NEW ARTICLE
-  // -------------------------------
+  async function likePost(id) {
+    if (!state.session?.user) {
+      openAuthModal();
+      return;
+    }
+    try {
+      const { error } = await state.db.from('likes').insert({
+        post_id: id,
+        user_id: state.session.user.id
+      });
+      if (error && !String(error.message).includes('duplicate')) throw error;
+      alert('Liked!');
+      loadPosts();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function bookmarkPost(id) {
+    if (!state.session?.user) {
+      openAuthModal();
+      return;
+    }
+    try {
+      const { error } = await state.db.from('bookmarks').insert({
+        post_id: id,
+        user_id: state.session.user.id
+      });
+      if (error && !String(error.message).includes('duplicate')) throw error;
+      alert('Bookmarked!');
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function uploadCover(file) {
+    if (!file) return '';
+    const extension = file.name.split('.').pop().toLowerCase();
+    const fileName = `${state.session.user.id}/${Date.now()}.${extension}`;
+    const { error } = await state.db.storage.from('blog-images').upload(fileName, file, { upsert: true });
+    if (error) throw error;
+    const { data } = state.db.storage.from('blog-images').getPublicUrl(fileName);
+    return data.publicUrl;
+  }
 
   async function submitPost(event) {
     event.preventDefault();
-
-    if (!isWriter() || !state.session?.user) {
-      $('postMessage').textContent =
-        'Author permission is required.';
+    if (!isWriter()) {
+      alert('Author permission is required.');
       return;
     }
+    const message = $('postMessage');
+    if (message) message.textContent = 'Submitting article…';
 
-    const title = $('postTitle').value.trim();
-    const content = $('postContent').value.trim();
+    try {
+      const file = $('coverFile')?.files?.[0];
+      const cover = file ? await uploadCover(file) : '';
+      const payload = {
+        title: $('postTitle').value.trim(),
+        excerpt: $('postExcerpt').value.trim(),
+        content: $('postContent').value.trim(),
+        category_id: $('postCategory').value || null,
+        cover_image: cover,
+        author_id: state.session.user.id,
+        author_name: state.profile?.username || state.profile?.full_name || state.session.user.email,
+        status: isAdmin() ? 'published' : 'pending'
+      };
 
-    if (!title || !content) {
-      $('postMessage').textContent =
-        'Enter an article title and content.';
-      return;
-    }
+      if (!payload.title || !payload.content) throw new Error('Title and content are required.');
 
-    $('postMessage').textContent = 'Submitting article…';
+      const { error } = await state.db.from('posts').insert(payload);
+      if (error) throw error;
 
-    let coverImage = null;
-    const file = $('coverFile').files?.[0];
-
-    if (file) {
-      if (
-        !file.type.startsWith('image/') ||
-        file.size > 5 * 1024 * 1024
-      ) {
-        $('postMessage').textContent =
-          'Choose an image smaller than 5 MB.';
-        return;
-      }
-
-      const safeName = file.name.replace(
-        /[^a-zA-Z0-9._-]/g,
-        '_'
-      );
-
-      const path =
-        `${state.session.user.id}/${Date.now()}-${safeName}`;
-
-      const { error: uploadError } = await state.db.storage
-        .from('blog-images')
-        .upload(path, file, {
-          upsert: false
-        });
-
-      if (uploadError) {
-        $('postMessage').textContent = uploadError.message;
-        return;
-      }
-
-      coverImage = state.db.storage
-        .from('blog-images')
-        .getPublicUrl(path).data.publicUrl;
-    }
-
-    const baseSlug = title.toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '') || 'article';
-
-    const { error } = await state.db.from('posts').insert({
-      author_id: state.session.user.id,
-      title,
-      slug: `${baseSlug}-${Date.now().toString().slice(-6)}`,
-      excerpt: $('postExcerpt').value.trim(),
-      content,
-      cover_image: coverImage,
-      category_id: $('postCategory').value || null,
-      status: 'pending'
-    });
-
-    $('postMessage').textContent = error
-      ? error.message
-      : 'Article submitted and is waiting for admin approval.';
-
-    if (!error) {
+      if (message) message.textContent = isAdmin() ? 'Article published successfully!' : 'Article submitted for approval.';
       $('postForm').reset();
-      await renderDashboard();
+    } catch (error) {
+      if (message) message.textContent = error.message;
+    }
+        }
+    async function renderDashboard() {
+    const host = $('dashboardContent');
+    if (!host) return;
+
+    if (!state.session?.user) {
+      host.innerHTML = '<div class="empty"><h3>Please login</h3><p>Login to view your dashboard.</p></div>';
+      return;
+    }
+
+    if (!state.profile) {
+      host.innerHTML = '<div class="empty"><h3>Profile not available</h3></div>';
+      return;
+    }
+
+    if (!isWriter()) {
+      host.innerHTML = '<div class="empty"><h3>Writer access required</h3><p>Your account does not have writer permissions.</p></div>';
+      return;
+    }
+
+    host.innerHTML = '<p>Loading dashboard…</p>';
+
+    try {
+      const { data, error } = await state.db.from('posts')
+        .select('*')
+        .eq('author_id', state.session.user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const posts = data || [];
+      host.innerHTML = `
+        <div class="dashboardstats">
+          <div class="stat"><strong>${posts.length}</strong><span>Total articles</span></div>
+          <div class="stat"><strong>${posts.filter(p => p.status === 'published').length}</strong><span>Published</span></div>
+          <div class="stat"><strong>${posts.filter(p => p.status === 'pending').length}</strong><span>Pending</span></div>
+        </div>
+        <h2>My Articles</h2>
+        <div class="adminlist">
+          ${posts.map(p => `
+            <div class="adminitem">
+              <strong>${esc(p.title)}</strong>
+              <p class="postmeta">${esc(p.status || 'draft')} · ${new Date(p.created_at).toLocaleDateString()}</p>
+              <button class="smallbtn deletePostBtn" data-id="${esc(p.id)}" type="button">Delete</button>
+            </div>
+          `).join('') || '<p>No articles created yet.</p>'}
+        </div>
+      `;
+
+      host.querySelectorAll('.deletePostBtn').forEach(btn => {
+        btn.onclick = async () => {
+          if (!confirm('Delete this article?')) return;
+          const { error } = await state.db.from('posts').delete().eq('id', btn.dataset.id);
+          if (error) alert(error.message);
+          else renderDashboard();
+        };
+      });
+
+      if (isAdmin()) await renderAdminTools(host);
+    } catch (error) {
+      host.innerHTML = `<div class="empty"><h3>Dashboard error</h3><p>${esc(error.message)}</p></div>`;
     }
   }
 
-  // -------------------------------
-  // PAGE CONTROLS
-  // -------------------------------
+  async function renderAdminTools(host) {
+    if (!host || !isAdmin()) return;
 
-  function wirePageControls() {
-    $('closeModal').onclick = closeModal;
+    const section = document.createElement('section');
+    section.className = 'adminlist';
+    section.innerHTML = `
+      <h2>Administration</h2>
+      <h3>Pending Articles</h3>
+      <div id="pendingPosts">Loading pending articles…</div>
+      <h3>Categories</h3>
+      <div id="adminCategories">Loading categories…</div>
+      <form id="categoryForm" class="inlineform">
+        <input id="newCategory" placeholder="New category name" required>
+        <button class="btn" type="submit">Add category</button>
+      </form>
+      <h3>Website Branding</h3>
+      <form id="brandingForm" class="adminlist">
+        <label>Website name</label>
+        <input id="siteNameInput" value="${esc(settingText(state.settings.site_name) || 'RK BlogSphere')}">
+        <label>Tagline</label>
+        <input id="taglineInput" value="${esc(settingText(state.settings.site_tagline))}">
+        <label>Hero title</label>
+        <input id="heroTitleInput" value="${esc(settingText(state.settings.hero_title))}">
+        <label>Hero description</label>
+        <textarea id="heroDescriptionInput">${esc(settingText(state.settings.hero_description))}</textarea>
+        <button class="btn" type="submit">Save branding</button>
+        <p id="brandingMessage"></p>
+      </form>
+      <h3>Logo Upload</h3>
+      <form id="logoForm" class="adminlist">
+        <label>Header logo</label><input type="file" id="headerLogoFile" accept="image/*">
+        <label>Home logo</label><input type="file" id="homeLogoFile" accept="image/*">
+        <label>Login logo</label><input type="file" id="loginLogoFile" accept="image/*">
+        <label>Footer logo</label><input type="file" id="footerLogoFile" accept="image/*">
+        <button class="btn" type="submit">Upload logos</button>
+        <p id="logoMessage"></p>
+      </form>
+    `;
+    host.appendChild(section);
 
-    $('modal').addEventListener('click', (event) => {
-      if (event.target === $('modal')) {
-        closeModal();
-      }
-    });
+    await loadPendingPosts();
+    renderAdminCategories();
 
-    $('postForm').onsubmit = submitPost;
-
-    $('search').oninput = renderPostList;
-    $('categoryFilter').onchange = renderPostList;
-
-    $('refreshBtn').onclick = async () => {
-      setStatus('Refreshing website…');
-
-      try {
+    $('categoryForm').onsubmit = async (event) => {
+      event.preventDefault();
+      const name = $('newCategory').value.trim();
+      if (!name) return;
+      const { error } = await state.db.from('categories').insert({ name });
+      if (error) alert(error.message);
+      else {
+        $('newCategory').value = '';
         await loadCategories();
-        await loadPosts();
+        renderAdminCategories();
+      }
+    };
+
+    $('brandingForm').onsubmit = async (event) => {
+      event.preventDefault();
+      const msg = $('brandingMessage');
+      msg.textContent = 'Saving…';
+      try {
+        await saveSetting('site_name', $('siteNameInput').value.trim());
+        await saveSetting('site_tagline', $('taglineInput').value.trim());
+        await saveSetting('hero_title', $('heroTitleInput').value.trim());
+        await saveSetting('hero_description', $('heroDescriptionInput').value.trim());
+        msg.textContent = 'Branding saved.';
       } catch (error) {
-        setStatus(error.message, true);
+        msg.textContent = error.message;
+      }
+    };
+
+    $('logoForm').onsubmit = async (event) => {
+      event.preventDefault();
+      const msg = $('logoMessage');
+      msg.textContent = 'Uploading…';
+      try {
+        const files = [
+          ['headerLogoFile', 'logo_header'],
+          ['homeLogoFile', 'logo_home'],
+          ['loginLogoFile', 'logo_login'],
+          ['footerLogoFile', 'logo_footer']
+        ];
+        for (const [id, key] of files) {
+          const file = $(id)?.files?.[0];
+          if (file) {
+            const url = await uploadCover(file);
+            await saveSetting(key, url);
+          }
+        }
+        msg.textContent = 'Logo upload complete.';
+      } catch (error) {
+        msg.textContent = error.message;
       }
     };
   }
 
-  // -------------------------------
-  // START WEBSITE
-  // -------------------------------
-
-  async function start() {
-    $('year').textContent = new Date().getFullYear();
-
-    const missing =
-      !cfg.SUPABASE_URL ||
-      !cfg.SUPABASE_ANON_KEY ||
-      String(cfg.SUPABASE_URL).includes('PASTE_') ||
-      String(cfg.SUPABASE_ANON_KEY).includes('PASTE_');
-
-    if (missing) {
-      setStatus('Supabase setup is missing.', true);
-
-      $('posts').innerHTML = `
-        <div class="message">
-          Add your Supabase Project URL and anon/public key in config.js.
-        </div>
-      `;
-
-      $('authArea').innerHTML = '';
-      return;
-    }
-
-    if (!window.supabase?.createClient) {
-      setStatus(
-        'Supabase library did not load. Check your internet connection.',
-        true
-      );
-
-      $('posts').innerHTML = `
-        <div class="message">
-          The Supabase client library could not load.
-          Refresh the page and try again.
-        </div>
-      `;
-
-      return;
-    }
-
-    state.db = window.supabase.createClient(
-      cfg.SUPABASE_URL,
-      cfg.SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      }
-    );
-
-    // Share the initialized Supabase client with optional frontend modules.
-    window.rkBlogSphereDB = state.db;
-
-    wirePageControls();
-    renderAuth();
-
-    setStatus('Connecting to Supabase…');
-
+  async function loadPendingPosts() {
+    const host = $('pendingPosts');
+    if (!host || !isAdmin()) return;
     try {
-      const { data, error } = await withTimeout(
-        state.db.auth.getSession(),
-        'Connecting to Supabase'
-      );
-
+      const { data, error } = await state.db.from('posts')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
       if (error) throw error;
 
-      state.session = data.session;
-
-      await Promise.allSettled([
-        loadSettings(),
-        loadCategories()
-      ]);
-
-      await loadProfile();
-      await loadPosts();
-
-    } catch (error) {
-      console.error('Website startup error:', error);
-
-      setStatus(
-        `Startup error: ${error.message || 'Could not connect to Supabase.'}`,
-        true
-      );
-
-      $('posts').innerHTML = `
-        <div class="message">
-          ${esc(error.message || 'Unable to connect to Supabase.')}
+      host.innerHTML = (data || []).map(p => `
+        <div class="adminitem">
+          <strong>${esc(p.title)}</strong>
+          <p>${esc(p.excerpt || '')}</p>
+          <div class="inlineform">
+            <button class="btn approveBtn" data-id="${esc(p.id)}" type="button">Approve</button>
+            <button class="smallbtn rejectBtn" data-id="${esc(p.id)}" type="button">Reject</button>
+          </div>
         </div>
-      `;
+      `).join('') || '<p>No pending articles.</p>';
+
+      host.querySelectorAll('.approveBtn').forEach(btn => {
+        btn.onclick = async () => {
+          const { error } = await state.db.from('posts').update({ status: 'published' }).eq('id', btn.dataset.id);
+          if (error) alert(error.message);
+          else {
+            await loadPendingPosts();
+            renderDashboard();
+          }
+        };
+      });
+
+      host.querySelectorAll('.rejectBtn').forEach(btn => {
+        btn.onclick = async () => {
+          const { error } = await state.db.from('posts').update({ status: 'rejected' }).eq('id', btn.dataset.id);
+          if (error) alert(error.message);
+          else {
+            await loadPendingPosts();
+            renderDashboard();
+          }
+        };
+      });
+    } catch (error) {
+      host.textContent = error.message;
+    }
+  }
+
+  function renderAdminCategories() {
+    const host = $('adminCategories');
+    if (!host || !isAdmin()) return;
+
+    host.innerHTML = state.categories.map(c => `
+      <div class="adminitem">
+        <span>${esc(c.name)}</span>
+        <button class="smallbtn deleteCategoryBtn" data-id="${esc(c.id)}" type="button">Delete</button>
+      </div>
+    `).join('') || '<p>No categories.</p>';
+
+    host.querySelectorAll('.deleteCategoryBtn').forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm('Delete category?')) return;
+        const { error } = await state.db.from('categories').delete().eq('id', btn.dataset.id);
+        if (error) alert(error.message);
+        else {
+          await loadCategories();
+          renderAdminCategories();
+        }
+      };
+    });
+    }
+    function wireEvents() {
+    const close = $('closeModal');
+    if (close) close.onclick = closeModal;
+
+    const modal = $('modal');
+    if (modal) {
+      modal.onclick = (event) => {
+        if (event.target === modal) closeModal();
+      };
+    }
+
+    const refresh = $('refreshBtn');
+    if (refresh) refresh.onclick = loadPosts;
+
+    const search = $('search');
+    if (search) search.oninput = loadPosts;
+
+    const category = $('categoryFilter');
+    if (category) category.onchange = loadPosts;
+
+    const form = $('postForm');
+    if (form) form.onsubmit = submitPost;
+
+    const year = $('year');
+    if (year) year.textContent = String(new Date().getFullYear());
+  }
+
+  async function start() {
+    for (const id of requiredIds) {
+      if (!$(id)) {
+        console.warn('Missing page element:', id);
+      }
+    }
+
+    if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+      setStatus('Supabase configuration missing. Please check config.js.', true);
+      return;
+    }
+
+    if (!window.supabase) {
+      setStatus('Supabase library could not load. Check your internet connection.', true);
+      return;
+    }
+
+    state.db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+    wireEvents();
+
+    try {
+      const { data, error } = await state.db.auth.getSession();
+      if (error) throw error;
+      state.session = data.session;
+    } catch (error) {
+      console.error('Session error:', error);
     }
 
     state.db.auth.onAuthStateChange((_event, session) => {
       state.session = session;
-
-      window.setTimeout(async () => {
-        try {
-          await loadProfile();
-          await loadPosts();
-        } catch (error) {
-          console.error('Login state update failed:', error);
-
-          setStatus(
-            error.message || 'Could not update login state.',
-            true
-          );
-        }
+      setTimeout(async () => {
+        await loadProfile();
+        if (page === 'index.html') await loadPosts();
+        if (page === 'dashboard.html') await renderDashboard();
       }, 0);
     });
-  }
 
-  // -------------------------------
-  // CHECK HTML AND INITIALIZE
-  // -------------------------------
+    await loadSettings();
+    await loadCategories();
+    await loadProfile();
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const missingElements = requiredIds.filter(
-      (id) => !$(id)
-    );
-
-    if (missingElements.length) {
-      console.error(
-        'RK BlogSphere: missing HTML elements:',
-        missingElements
-      );
-
-      return;
+    if (page === 'index.html') {
+      await loadPosts();
     }
 
-    start();
+    if (page === 'write.html') {
+      renderWriteForm();
+    }
+
+    if (page === 'dashboard.html') {
+      await renderDashboard();
+    }
+
+    renderAuth();
+  }
+
+  start().catch(error => {
+    console.error('RK BlogSphere startup error:', error);
+    setStatus('Website initialization error: ' + error.message, true);
   });
 
 })();
-  
-  
+
