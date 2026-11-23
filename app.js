@@ -315,8 +315,9 @@
 
   function categoryName(id) {
     return state.categories.find((item) => item.id === id)?.name || 'Article';
-        }
-    async function loadPosts() {
+  }
+
+  async function loadPosts() {
     setStatus('Loading articles…');
     $('posts').innerHTML =
       '<div class="message">Connecting to RK BlogSphere…</div>';
@@ -485,9 +486,8 @@
         if (!insertError) $('commentForm').reset();
       };
     }
-  }
-
-  async function saveBookmark(postId) {
+      }
+    async function saveBookmark(postId) {
     const { error } = await state.db.from('bookmarks').insert({
       post_id: postId,
       user_id: state.session.user.id
@@ -539,7 +539,8 @@
     await loadPosts();
     await renderDashboard();
   }
-    async function renderDashboard() {
+
+  async function renderDashboard() {
     const host = $('dashboardContent');
 
     if (!state.session?.user) {
@@ -881,7 +882,7 @@
           input.files?.[0]
         );
       });
-}
+  }
     // -------------------------------
   // LOGO UPLOAD
   // -------------------------------
@@ -1108,6 +1109,9 @@
       }
     );
 
+    // Share the initialized Supabase client with optional frontend modules.
+    window.rkBlogSphereDB = state.db;
+
     wirePageControls();
     renderAuth();
 
@@ -1187,3 +1191,5 @@
   });
 
 })();
+  
+  
