@@ -50,7 +50,44 @@ class="rkb-logo-image rkb-header-logo">
 </div>
 
 <div id="dashboardContent" class="dashboard-panel">
-Sign in to view your dashboard.
+
+  <div id="dashboardWelcome">
+    <h2>Welcome to RK BlogSphere</h2>
+    <p>Please sign in to access your dashboard.</p>
+    <button type="button" onclick="BLOGSPHERE.openLogin()">Sign In</button>
+  </div>
+
+  <div id="writerArea" hidden>
+    <section class="dashboard-section">
+      <h2>Write Article</h2>
+      <div id="writePrompt"></div>
+      <div id="writeForm"></div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2>My Articles</h2>
+      <div id="myPosts"></div>
+    </section>
+  </div>
+
+  <div id="adminArea" hidden>
+    <section class="dashboard-section">
+      <h2>Category Management</h2>
+      <form id="categoryForm">
+        <input type="text" id="categoryName" placeholder="Category name" required>
+        <button type="submit">Add Category</button>
+      </form>
+      <div id="adminCategories"></div>
+    </section>
+  </div>
+
+  <div id="superAdminArea" hidden>
+    <section class="dashboard-section">
+      <h2>User Management</h2>
+      <div id="allUsers"></div>
+    </section>
+  </div>
+
 </div>
 
 </main>
