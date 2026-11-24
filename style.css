@@ -1361,3 +1361,90 @@ footer a {
     min-width: 0;
   }
 }
+/* RK BLOGSPHERE GLOBAL LOGO */
+
+.rkb-global-header-logo {
+  width: auto;
+  max-width: 180px;
+  max-height: 55px;
+  object-fit: contain;
+  display: inline-block;
+  margin: 8px 12px;
+}
+
+.rkb-global-footer-logo {
+  display: block;
+  width: auto;
+  max-width: 160px;
+  max-height: 65px;
+  object-fit: contain;
+  margin: 0 auto 15px;
+}
+
+.rkb-branding-manager {
+  margin: 25px 0;
+  padding: 25px;
+  border: 1px solid #c4b5fd;
+  border-radius: 20px;
+  background: linear-gradient(135deg,#f5f3ff,#eff6ff);
+  box-shadow: 0 8px 25px rgba(49,46,129,.10);
+}
+
+.rkb-branding-manager h2 {
+  color: #312e81;
+  margin-bottom: 12px;
+}
+
+.rkb-logo-preview-box {
+  min-height: 120px;
+  margin: 18px 0;
+  padding: 18px;
+  border: 2px dashed #a78bfa;
+  border-radius: 15px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rkb-logo-preview-box img {
+  max-width: 220px;
+  max-height: 110px;
+  object-fit: contain;
+}
+
+.rkb-logo-preview-box p {
+  color: #64748b;
+}
+
+.rkb-branding-manager input[type="file"] {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.rkb-logo-help {
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media(max-width:600px) {
+  .rkb-global-header-logo {
+    max-width: 125px;
+    max-height: 42px;
+    margin: 5px;
+  }
+
+  .rkb-global-footer-logo {
+    max-width: 130px;
+    max-height: 55px;
+  }
+
+  .rkb-branding-manager {
+    padding: 16px;
+  }
+}
