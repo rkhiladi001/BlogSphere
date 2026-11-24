@@ -1651,7 +1651,7 @@
     // Show login/signup buttons immediately
     renderAuth();
 
-    const connected = initializeSupabase();
+    const connected = await initializeSupabase();
 
     if (!connected || !state.db) {
       setStatus('Supabase connection is not configured. Check config.js.');
