@@ -4,7 +4,6 @@
 
   const $ = (id) => document.getElementById(id);
   const cfg = window.BLOGSPHERE_CONFIG || {};
-
   const page = location.pathname.split('/').pop() || 'index.html';
 
   const state = {
@@ -52,7 +51,6 @@
   function message(id, text, error = false) {
     const element = $(id);
     if (!element) return;
-
     element.textContent = text;
     element.style.color = error ? '#dc2626' : '#16a34a';
   }
@@ -64,33 +62,33 @@
 
   // MODAL
   function showModal(content) {
-  const modal = $('modal');
-  if (!modal) return;
+    const modal = $('modal');
+    if (!modal) return;
 
-  modal.innerHTML = `
-    <div class="modal-overlay">
-      <div class="modal-content">
-        ${content}
+    modal.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-content">
+          ${content}
+        </div>
       </div>
-    </div>
-  `;
+    `;
 
-  modal.hidden = false;
+    modal.hidden = false;
 
-  const overlay = modal.querySelector('.modal-overlay');
+    const overlay = modal.querySelector('.modal-overlay');
 
-  overlay?.addEventListener('click', event => {
-    if (event.target === overlay) closeModal();
-  });
+    overlay?.addEventListener('click', event => {
+      if (event.target === overlay) closeModal();
+    });
 
-  modal.querySelectorAll('[data-close-modal]').forEach(button => {
-    button.addEventListener('click', closeModal);
-  });
+    modal.querySelectorAll('[data-close-modal]').forEach(button => {
+      button.addEventListener('click', closeModal);
+    });
   }
+
   // DATE FORMAT
   function formatDate(date) {
     if (!date) return '';
-
     return new Date(date).toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
@@ -134,14 +132,11 @@
       );
 
       console.log('RK BlogSphere: Supabase connected.');
-
       return true;
 
     } catch (error) {
       console.error('Supabase initialization failed:', error);
-
       state.db = null;
-
       return false;
     }
   }
@@ -153,15 +148,9 @@
 
     if (!isLoggedIn()) {
       area.innerHTML = `
-        <button type="button" data-action="login">
-          Sign In
-        </button>
-
-        <button type="button" data-action="signup">
-          Sign Up
-        </button>
+        <button type="button" data-action="login">Sign In</button>
+        <button type="button" data-action="signup">Sign Up</button>
       `;
-
       return;
     }
 
@@ -174,16 +163,9 @@
           height="36"
           style="border-radius:50%;object-fit:cover"
         >
-
         <span>${esc(getUserName())}</span>
-
-        <button type="button" data-action="profile">
-          My Profile
-        </button>
-
-        <button type="button" data-action="logout">
-          Logout
-        </button>
+        <button type="button" data-action="profile">My Profile</button>
+        <button type="button" data-action="logout">Logout</button>
       </div>
     `;
   }
@@ -199,17 +181,11 @@
 
     showModal(`
       <div class="auth-modal">
-
-        <button type="button"
-          data-close-modal
-          class="modal-close">
-          ×
-        </button>
+        <button type="button" data-close-modal class="modal-close">×</button>
 
         <h2>${signup ? 'Create Account' : 'Welcome Back'}</h2>
 
         <form id="authForm">
-
           ${signup ? `
             <label>Full Name</label>
             <input
@@ -243,17 +219,14 @@
           <button type="submit" id="authSubmit">
             ${signup ? 'Create Account' : 'Sign In'}
           </button>
-
         </form>
 
         <p>
           ${signup ? 'Already have an account?' : 'New user?'}
-          <button type="button"
-            data-action="${signup ? 'login' : 'signup'}">
+          <button type="button" data-action="${signup ? 'login' : 'signup'}">
             ${signup ? 'Sign In' : 'Sign Up'}
           </button>
         </p>
-
       </div>
     `);
 
@@ -281,9 +254,7 @@
             email,
             password,
             options: {
-              data: {
-                full_name: fullName
-              }
+              data: { full_name: fullName }
             }
           });
         } else {
@@ -302,7 +273,6 @@
         }
 
         closeModal();
-
         await handleAuthState(result.data.session);
 
       } catch (error) {
@@ -331,14 +301,13 @@
 
     state.session = null;
     state.profile = null;
-
     renderAuth();
     setupPageAccess();
-
     alert('Logged out successfully.');
     location.reload();
   }
-    // LOAD USER PROFILE
+
+  // LOAD USER PROFILE
   async function loadProfile() {
     if (!state.session?.user || !state.db) return;
 
@@ -351,21 +320,37 @@
 
       if (error) throw error;
 
-      state.profile = data || null;
+      state.profile = data;
 
-      if (!state.profile) {
-        console.warn('User profile not found.');
+      if (!data) {
+        const fullName =
+          state.session.user.user_metadata?.full_name || 'User';
+
+        const username = fullName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .slice(0, 20) || 'user';
+
+        const { data: created, error: insertError } = await state.db
+          .from('profiles')
+          .insert({
+            id: state.session.user.id,
+            full_name: fullName,
+            username,
+            role: 'user'
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        state.profile = created;
       }
 
     } catch (error) {
-      console.error('Profile loading error:', error);
-      state.profile = null;
+      console.error('Profile load error:', error);
     }
-
-    renderAuth();
   }
-
-  // OPEN PROFILE
+    // OPEN PROFILE
   function openProfile() {
     if (!isLoggedIn() || !state.profile) {
       alert('Please sign in first.');
@@ -374,73 +359,41 @@
 
     showModal(`
       <div class="profile-modal">
-
-        <button type="button"
-          data-close-modal
-          class="modal-close">×</button>
+        <button type="button" data-close-modal class="modal-close">×</button>
 
         <h2>My Profile</h2>
 
         <div class="profile-avatar">
-          <img
-            src="${getAvatar()}"
-            alt="Profile Photo"
-            width="100"
-            height="100"
-            style="border-radius:50%;object-fit:cover"
-          >
+          <img src="${getAvatar()}" alt="Profile Photo"
+            width="100" height="100"
+            style="border-radius:50%;object-fit:cover">
         </div>
 
         <label>Profile Photo</label>
-        <input type="file"
-          id="profilePhoto"
-          accept="image/*">
+        <input type="file" id="profilePhoto" accept="image/*">
 
         <form id="profileForm">
-
           <label>Full Name</label>
-          <input
-            type="text"
-            id="profileName"
-            value="${esc(state.profile.full_name || '')}"
-            required
-          >
+          <input type="text" id="profileName"
+            value="${esc(state.profile.full_name || '')}" required>
 
           <label>Username</label>
-          <input
-            type="text"
-            value="${esc(state.profile.username || '')}"
-            disabled
-          >
+          <input type="text" value="${esc(state.profile.username || '')}" disabled>
 
           <label>Email</label>
-          <input
-            type="email"
-            value="${esc(state.session.user.email || '')}"
-            disabled
-          >
+          <input type="email" value="${esc(state.session.user.email || '')}" disabled>
 
           <label>Mobile Number (Optional)</label>
-          <input
-            type="tel"
-            id="profilePhone"
+          <input type="tel" id="profilePhone"
             value="${esc(state.profile.phone || '')}"
-            placeholder="Enter mobile number"
-          >
+            placeholder="Enter mobile number">
 
           <label>Bio</label>
-          <textarea
-            id="profileBio"
-            rows="4"
-            placeholder="Tell us about yourself"
-          >${esc(state.profile.bio || '')}</textarea>
+          <textarea id="profileBio" rows="4"
+            placeholder="Tell us about yourself">${esc(state.profile.bio || '')}</textarea>
 
           <p id="profileMessage"></p>
-
-          <button type="submit" id="saveProfileButton">
-            Save Profile
-          </button>
-
+          <button type="submit" id="saveProfileButton">Save Profile</button>
         </form>
       </div>
     `);
@@ -452,10 +405,7 @@
 
     $('profilePhoto')?.addEventListener('change', async event => {
       const file = event.target.files?.[0];
-
-      if (file) {
-        await uploadProfilePhoto(file);
-      }
+      if (file) await uploadProfilePhoto(file);
     });
   }
 
@@ -475,15 +425,11 @@
 
     try {
       const extension = file.name.split('.').pop().toLowerCase();
-
-      const path =
-        `${state.session.user.id}/profile-${Date.now()}.${extension}`;
+      const path = `${state.session.user.id}/profile-${Date.now()}.${extension}`;
 
       const { error: uploadError } = await state.db.storage
         .from('blog-images')
-        .upload(path, file, {
-          upsert: true
-        });
+        .upload(path, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
@@ -493,9 +439,7 @@
 
       const { data: updatedProfile, error } = await state.db
         .from('profiles')
-        .update({
-          avatar_url: data.publicUrl
-        })
+        .update({ avatar_url: data.publicUrl })
         .eq('id', state.session.user.id)
         .select()
         .single();
@@ -505,7 +449,6 @@
       state.profile = updatedProfile;
 
       alert('Profile photo uploaded successfully.');
-
       openProfile();
       renderAuth();
 
@@ -519,7 +462,6 @@
     if (!state.db || !isLoggedIn()) return;
 
     const button = $('saveProfileButton');
-
     const fullName = $('profileName')?.value.trim();
     const phone = $('profilePhone')?.value.trim() || null;
     const bio = $('profileBio')?.value.trim() || null;
@@ -537,11 +479,7 @@
     try {
       const { data, error } = await state.db
         .from('profiles')
-        .update({
-          full_name: fullName,
-          phone,
-          bio
-        })
+        .update({ full_name: fullName, phone, bio })
         .eq('id', state.session.user.id)
         .select()
         .single();
@@ -549,9 +487,7 @@
       if (error) throw error;
 
       state.profile = data;
-
       message('profileMessage', 'Profile saved successfully.');
-
       renderAuth();
 
     } catch (error) {
@@ -577,7 +513,6 @@
       if (error) throw error;
 
       state.settings = {};
-
       (data || []).forEach(item => {
         state.settings[item.key] = item.value;
       });
@@ -598,31 +533,26 @@
     }
 
     const brand = $('siteName');
-
     if (brand && settings.site_title) {
       brand.textContent = settings.site_title;
     }
 
     const footer = $('footerText');
-
     if (footer && settings.footer_text) {
       footer.textContent = settings.footer_text;
     }
 
     const heroTitle = $('heroTitle');
-
     if (heroTitle && settings.hero_title) {
       heroTitle.textContent = settings.hero_title;
     }
 
     const heroDescription = $('heroDescription');
-
     if (heroDescription && settings.hero_description) {
       heroDescription.textContent = settings.hero_description;
     }
 
     const logo = $('siteLogo');
-
     if (logo && settings.logo_url) {
       logo.src = settings.logo_url;
       logo.hidden = false;
@@ -680,7 +610,7 @@
     );
 
     return category?.name || 'Uncategorized';
-              }
+ }
     // LOAD POSTS
   async function loadPosts() {
     if (!state.db) return;
@@ -736,7 +666,7 @@
     }
   }
 
-  // RENDER POSTS
+  // RENDER PROFESSIONAL ARTICLE CARDS
   function renderPosts() {
     const host = $('posts');
     if (!host) return;
@@ -778,30 +708,34 @@
             <span>${formatDate(post.created_at)}</span>
           </div>
 
-          <button
-            type="button"
-            data-post-id="${esc(post.id)}">
-            Read More
-          </button>
+          <div class="post-card-actions">
 
-          <button
-            type="button"
-            data-like-post="${esc(post.id)}">
-            Like
-          </button>
+            <button
+              type="button"
+              data-post-id="${esc(post.id)}">
+              Read More
+            </button>
 
-          <button
-            type="button"
-            data-bookmark-post="${esc(post.id)}">
-            Bookmark
-          </button>
+            <button
+              type="button"
+              data-like-post="${esc(post.id)}">
+              Like
+            </button>
+
+            <button
+              type="button"
+              data-bookmark-post="${esc(post.id)}">
+              Bookmark
+            </button>
+
+          </div>
 
         </div>
       </article>
     `).join('');
   }
 
-  // OPEN POST
+  // OPEN ARTICLE
   async function openPost(postId) {
     if (!state.db) return;
 
@@ -829,17 +763,19 @@
             >
           ` : ''}
 
-          <span>${esc(categoryName(post.category_id))}</span>
+          <span class="post-category">
+            ${esc(categoryName(post.category_id))}
+          </span>
 
           <h1>${esc(post.title)}</h1>
 
-          <p>
+          <p class="post-meta">
             By ${esc(post.author_name || 'Author')}
             · ${formatDate(post.created_at)}
           </p>
 
           <div class="post-content">
-            ${esc(post.content).replace(/\n/g, '<br>')}
+            ${esc(post.content || '').replace(/\n/g, '<br>')}
           </div>
 
           <hr>
@@ -904,7 +840,11 @@
       host.innerHTML = data.map(comment => `
         <div class="comment-item">
           <strong>${esc(comment.author_name || 'User')}</strong>
-          <p>${esc(comment.content || comment.comment || '')}</p>
+
+          <p>
+            ${esc(comment.content || comment.comment || '')}
+          </p>
+
           <small>${formatDate(comment.created_at)}</small>
         </div>
       `).join('');
@@ -937,6 +877,9 @@
 
       if (error) throw error;
 
+      const commentInput = $('commentText');
+      if (commentInput) commentInput.value = '';
+
       await loadComments(postId);
 
     } catch (error) {
@@ -944,7 +887,7 @@
     }
   }
 
-  // LIKE POST
+  // LIKE ARTICLE
   async function likePost(postId) {
     if (!isLoggedIn()) {
       alert('Please sign in to like articles.');
@@ -975,7 +918,7 @@
     }
   }
 
-  // BOOKMARK POST
+  // BOOKMARK ARTICLE
   async function bookmarkPost(postId) {
     if (!isLoggedIn()) {
       alert('Please sign in to bookmark articles.');
@@ -1005,8 +948,7 @@
       alert('Bookmark failed: ' + error.message);
     }
   }
-
-  // UPLOAD POST IMAGE
+    // UPLOAD ARTICLE IMAGE
   async function uploadImage(file) {
     if (!state.db || !isLoggedIn()) return null;
 
@@ -1019,9 +961,7 @@
     }
 
     const extension = file.name.split('.').pop().toLowerCase();
-
-    const path =
-      `${state.session.user.id}/post-${Date.now()}.${extension}`;
+    const path = `${state.session.user.id}/post-${Date.now()}.${extension}`;
 
     const { error } = await state.db.storage
       .from('blog-images')
@@ -1034,8 +974,9 @@
       .getPublicUrl(path);
 
     return data.publicUrl;
-        }
-    // WRITE FORM ACCESS
+  }
+
+  // WRITE FORM ACCESS
   function renderWriteForm() {
     const prompt = $('writePrompt');
     const form = $('writeForm');
@@ -1043,7 +984,8 @@
     if (!isWriter()) {
       if (prompt) {
         prompt.hidden = false;
-        prompt.textContent = 'Please sign in with an Author account to write articles.';
+        prompt.textContent =
+          'Please sign in with an Author account to write articles.';
       }
 
       if (form) form.hidden = true;
@@ -1051,10 +993,68 @@
     }
 
     if (prompt) prompt.hidden = true;
-    if (form) form.hidden = false;
+
+    if (form) {
+      form.hidden = false;
+
+      if (!form.querySelector('#articleForm')) {
+        form.innerHTML = `
+          <form id="articleForm">
+
+            <label>Article Title</label>
+            <input id="postTitle"
+              required maxlength="200"
+              placeholder="Article title">
+
+            <label>Short Description</label>
+            <textarea id="postExcerpt"
+              rows="3"
+              placeholder="Short summary"></textarea>
+
+            <label>Article Content</label>
+            <textarea id="postContent"
+              rows="10"
+              required
+              placeholder="Write your article..."></textarea>
+
+            <label>Category</label>
+            <select id="postCategory">
+              <option value="">Select Category</option>
+            </select>
+
+            <label>Cover Image (Optional)</label>
+            <input type="file"
+              id="postImage"
+              accept="image/*">
+
+            <label>Status</label>
+            <select id="postStatus">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+
+            <button type="submit">Submit Article</button>
+
+          </form>
+        `;
+
+        const select = $('postCategory');
+
+        if (select) {
+          select.innerHTML = `
+            <option value="">Select Category</option>
+            ${state.categories.map(category => `
+              <option value="${esc(category.id)}">
+                ${esc(category.name)}
+              </option>
+            `).join('')}
+          `;
+        }
+      }
+    }
   }
 
-  // SUBMIT OR UPDATE POST
+  // SUBMIT OR UPDATE ARTICLE
   async function submitPost() {
     if (!isWriter()) {
       alert('You do not have permission to publish posts.');
@@ -1075,7 +1075,8 @@
       return;
     }
 
-    const button = form?.querySelector('[type="submit"]');
+    const articleForm = $('articleForm');
+    const button = articleForm?.querySelector('[type="submit"]');
 
     if (button) {
       button.disabled = true;
@@ -1104,7 +1105,6 @@
       }
 
       const editingId = form?.dataset.editingId;
-
       let result;
 
       if (editingId) {
@@ -1121,20 +1121,25 @@
 
       if (result.error) throw result.error;
 
+      articleForm?.reset();
+
       if (form) {
-        form.reset();
         delete form.dataset.editingId;
       }
 
+      if (button) {
+        button.textContent = 'Submit Article';
+      }
+
       alert(editingId
-        ? 'Post updated successfully.'
-        : 'Post submitted successfully.');
+        ? 'Article updated successfully.'
+        : 'Article submitted successfully.');
 
       await loadPosts();
       await loadUserPosts();
 
     } catch (error) {
-      alert('Post save failed: ' + error.message);
+      alert('Article save failed: ' + error.message);
 
     } finally {
       if (button) {
@@ -1144,7 +1149,7 @@
     }
   }
 
-  // LOAD USER POSTS
+  // LOAD MY ARTICLES
   async function loadUserPosts() {
     if (!isWriter() || !state.db) return;
 
@@ -1158,21 +1163,24 @@
       if (error) throw error;
 
       state.userPosts = data || [];
-
       renderUserPosts();
 
     } catch (error) {
-      console.error('User posts error:', error);
+      console.error('My articles loading error:', error);
     }
   }
 
-  // RENDER USER POSTS
+  // RENDER MY ARTICLES
   function renderUserPosts() {
     const host = $('myPosts');
     if (!host) return;
 
     if (!state.userPosts.length) {
-      host.innerHTML = '<p>You have not written any articles yet.</p>';
+      host.innerHTML = `
+        <div class="empty">
+          <p>You have not written any articles yet.</p>
+        </div>
+      `;
       return;
     }
 
@@ -1186,14 +1194,14 @@
           <strong>${esc(post.status)}</strong>
         </p>
 
-        <button
-          type="button"
+        <p>${formatDate(post.created_at)}</p>
+
+        <button type="button"
           data-edit-post="${esc(post.id)}">
           Edit
         </button>
 
-        <button
-          type="button"
+        <button type="button"
           data-delete-post="${esc(post.id)}">
           Delete
         </button>
@@ -1202,14 +1210,14 @@
     `).join('');
   }
 
-  // EDIT POST
+  // EDIT ARTICLE
   function editPost(postId) {
     const post = state.userPosts.find(
       item => String(item.id) === String(postId)
     );
 
     if (!post) {
-      alert('Post not found.');
+      alert('Article not found.');
       return;
     }
 
@@ -1222,18 +1230,21 @@
       return;
     }
 
-    $('postTitle').value = post.title || '';
-    $('postExcerpt').value = post.excerpt || '';
-    $('postContent').value = post.content || '';
-    $('postCategory').value = post.category_id || '';
+    const title = $('postTitle');
+    const excerpt = $('postExcerpt');
+    const content = $('postContent');
+    const category = $('postCategory');
+    const status = $('postStatus');
 
-    if ($('postStatus')) {
-      $('postStatus').value = post.status || 'draft';
-    }
+    if (title) title.value = post.title || '';
+    if (excerpt) excerpt.value = post.excerpt || '';
+    if (content) content.value = post.content || '';
+    if (category) category.value = post.category_id || '';
+    if (status) status.value = post.status || 'draft';
 
     form.dataset.editingId = post.id;
 
-    const button = form.querySelector('[type="submit"]');
+    const button = $('articleForm')?.querySelector('[type="submit"]');
 
     if (button) {
       button.textContent = 'Update Article';
@@ -1245,7 +1256,7 @@
     });
   }
 
-  // DELETE POST
+  // DELETE ARTICLE
   async function deletePost(postId) {
     if (!isWriter()) return;
 
@@ -1268,24 +1279,114 @@
       await loadPosts();
 
     } catch (error) {
-      alert('Delete failed: ' + error.message);
+      alert('Article deletion failed: ' + error.message);
     }
+      }
+    // ADMIN PANEL
+  function setupAdminPanel() {
+    const adminArea = $('adminArea');
+    const superAdminArea = $('superAdminArea');
+
+    if (adminArea) {
+      adminArea.hidden = !isAdmin();
+    }
+
+    if (superAdminArea) {
+      superAdminArea.hidden = !isSuperAdmin();
+    }
+
+    if (!isAdmin()) return;
+
+    renderAdminPanel();
+
+    if (isSuperAdmin()) {
+      loadUsers();
+    }
+  }
+
+  // RENDER ADMIN CONTROLS
+  function renderAdminPanel() {
+    const host = $('adminArea');
+    if (!host || !isAdmin()) return;
+
+    host.innerHTML = `
+      <div class="admin-panel">
+
+        <h2>Administration</h2>
+
+        <section class="dashboard-section">
+          <h3>Category Management</h3>
+
+          <form id="categoryForm">
+            <input type="text"
+              id="newCategory"
+              placeholder="Enter category name"
+              required>
+
+            <button type="submit">Add Category</button>
+          </form>
+
+          <div id="adminCategories"></div>
+        </section>
+
+        <section class="dashboard-section">
+          <h3>Website Settings</h3>
+
+          <form id="settingsForm">
+
+            <label>Website Title</label>
+            <input type="text" id="settingTitle">
+
+            <label>Footer Text</label>
+            <input type="text" id="settingFooter">
+
+            <label>Hero Title</label>
+            <input type="text" id="settingHeroTitle">
+
+            <label>Hero Description</label>
+            <textarea id="settingHeroDescription"></textarea>
+
+            <label>Website Logo URL</label>
+            <input type="url" id="settingLogo">
+
+            <button type="submit">Save Settings</button>
+          </form>
+        </section>
+
+      </div>
+    `;
+
+    renderAdminCategories();
+    populateSettingsForm();
+  }
+
+  // RENDER ADMIN CATEGORIES
+  function renderAdminCategories() {
+    const host = $('adminCategories');
+    if (!host) return;
+
+    host.innerHTML = state.categories.map(category => `
+      <div class="category-admin-item">
+
+        <span>${esc(category.name)}</span>
+
+        <button type="button"
+          data-delete-category="${esc(category.id)}">
+          Delete
+        </button>
+
+      </div>
+    `).join('');
   }
 
   // ADD CATEGORY
   async function addCategory() {
-    if (!isAdmin()) {
-      alert('Admin permission required.');
-      return;
-    }
+    if (!isAdmin()) return;
 
-    const input = $('categoryName');
+    const input = $('newCategory');
     const name = input?.value.trim();
 
-    if (!name) {
-      alert('Please enter category name.');
-      return;
-    }
+    if (!name) return;
 
     try {
       const { error } = await state.db
@@ -1294,15 +1395,15 @@
 
       if (error) throw error;
 
-      input.value = '';
+      if (input) input.value = '';
+
+      alert('Category added successfully.');
 
       await loadCategories();
       renderAdminCategories();
 
-      alert('Category added successfully.');
-
     } catch (error) {
-      alert('Category error: ' + error.message);
+      alert('Category addition failed: ' + error.message);
     }
   }
 
@@ -1320,153 +1421,191 @@
 
       if (error) throw error;
 
+      alert('Category deleted successfully.');
+
       await loadCategories();
       renderAdminCategories();
 
-      alert('Category deleted successfully.');
-
     } catch (error) {
-      alert('Category delete failed: ' + error.message);
+      alert('Category deletion failed: ' + error.message);
     }
   }
 
-  // RENDER ADMIN CATEGORIES
-  function renderAdminCategories() {
-    const host = $('adminCategories');
-    if (!host) return;
+  // POPULATE SETTINGS FORM
+  function populateSettingsForm() {
+    if (!isAdmin()) return;
 
-    if (!isAdmin()) {
-      host.innerHTML = '';
-      return;
+    const title = $('settingTitle');
+    const footer = $('settingFooter');
+    const heroTitle = $('settingHeroTitle');
+    const heroDescription = $('settingHeroDescription');
+    const logo = $('settingLogo');
+
+    if (title) title.value = state.settings.site_title || '';
+    if (footer) footer.value = state.settings.footer_text || '';
+    if (heroTitle) heroTitle.value = state.settings.hero_title || '';
+    if (heroDescription) {
+      heroDescription.value = state.settings.hero_description || '';
     }
+    if (logo) logo.value = state.settings.logo_url || '';
+  }
 
-    host.innerHTML = state.categories.map(category => `
-      <div class="admin-category-item">
+  // SAVE WEBSITE SETTINGS
+  async function saveSettings() {
+    if (!isAdmin()) return;
 
-        <span>${esc(category.name)}</span>
+    const settings = [
+      { key: 'site_title', value: $('settingTitle')?.value.trim() || '' },
+      { key: 'footer_text', value: $('settingFooter')?.value.trim() || '' },
+      { key: 'hero_title', value: $('settingHeroTitle')?.value.trim() || '' },
+      { key: 'hero_description', value: $('settingHeroDescription')?.value.trim() || '' },
+      { key: 'logo_url', value: $('settingLogo')?.value.trim() || '' }
+    ];
 
-        <button
-          type="button"
-          data-delete-category="${esc(category.id)}">
-          Delete
-        </button>
+    try {
+      for (const item of settings) {
+        const { error } = await state.db
+          .from('site_settings')
+          .upsert(item, { onConflict: 'key' });
 
-      </div>
-    `).join('');
+        if (error) throw error;
       }
-    // LOAD ALL USERS - SUPER ADMIN ONLY
-  async function loadAllUsers() {
+
+      alert('Website settings saved successfully.');
+
+      await loadSettings();
+
+    } catch (error) {
+      alert('Settings save failed: ' + error.message);
+    }
+  }
+
+  // SUPER ADMIN: LOAD USERS
+  async function loadUsers() {
     if (!isSuperAdmin() || !state.db) return;
 
-    const host = $('allUsers');
+    const host = $('superAdminArea');
     if (!host) return;
-
-    host.innerHTML = '<p>Loading users...</p>';
 
     try {
       const { data, error } = await state.db
         .from('profiles')
-        .select(`
-          id,
-          full_name,
-          username,
-          phone,
-          bio,
-          avatar_url,
-          role,
-          created_at
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       state.allUsers = data || [];
 
-      renderAllUsers();
+      renderUsers();
 
     } catch (error) {
-      console.error('User loading error:', error);
-
       host.innerHTML = `
-        <p>Unable to load users: ${esc(error.message)}</p>
+        <div class="empty">
+          <h3>User Management</h3>
+          <p>${esc(error.message)}</p>
+        </div>
       `;
     }
   }
 
-  // RENDER ALL USERS
-  function renderAllUsers() {
-    const host = $('allUsers');
-    if (!host || !isSuperAdmin()) return;
+  // SUPER ADMIN: RENDER USERS
+  function renderUsers() {
+    if (!isSuperAdmin()) return;
 
-    if (!state.allUsers.length) {
-      host.innerHTML = '<p>No users found.</p>';
-      return;
-    }
+    const host = $('superAdminArea');
+    if (!host) return;
 
-    host.innerHTML = state.allUsers.map(user => `
-      <div class="admin-user-card">
+    host.hidden = false;
 
-        <div class="admin-user-info">
+    host.innerHTML = `
+      <div class="super-admin-panel">
 
-          <img
-            src="${esc(user.avatar_url || 'https://ui-avatars.com/api/?name=User')}"
-            alt="User"
-            width="55"
-            height="55"
-            style="border-radius:50%;object-fit:cover"
-          >
+        <h2>Super Admin - User Management</h2>
 
-          <h3>${esc(user.full_name || 'Unnamed User')}</h3>
+        <p>
+          Manage user accounts and assign roles.
+        </p>
 
-          <p>Username: ${esc(user.username || 'Not generated')}</p>
+        <div id="usersList">
+          ${state.allUsers.map(user => `
+            <div class="user-admin-card">
 
-          <p>Mobile: ${esc(user.phone || 'Not provided')}</p>
+              <h3>${esc(user.full_name || user.username || 'User')}</h3>
 
-          <p>Bio: ${esc(user.bio || 'No bio')}</p>
+              <p>
+                Username:
+                ${esc(user.username || 'Not available')}
+              </p>
 
-          <p>Joined: ${formatDate(user.created_at)}</p>
+              <p>
+                Role:
+                <strong>${esc(user.role || 'user')}</strong>
+              </p>
 
+              <p>
+                Bio:
+                ${esc(user.bio || '')}
+              </p>
+
+              <p>
+                Mobile:
+                ${esc(user.phone || 'Not provided')}
+              </p>
+
+              <div class="role-control">
+
+                <label>Change Role</label>
+
+                <select id="role-${esc(user.id)}">
+
+                  <option value="user"
+                    ${user.role === 'user' ? 'selected' : ''}>
+                    User
+                  </option>
+
+                  <option value="author"
+                    ${user.role === 'author' ? 'selected' : ''}>
+                    Author
+                  </option>
+
+                  <option value="editor"
+                    ${user.role === 'editor' ? 'selected' : ''}>
+                    Editor
+                  </option>
+
+                  <option value="admin"
+                    ${user.role === 'admin' ? 'selected' : ''}>
+                    Admin
+                  </option>
+
+                  ${user.role === 'super_admin' ? `
+                    <option value="super_admin" selected>
+                      Super Admin
+                    </option>
+                  ` : ''}
+
+                </select>
+
+                <button type="button"
+                  data-change-role="${esc(user.id)}">
+                  Save Role
+                </button>
+
+              </div>
+
+            </div>
+          `).join('')}
         </div>
 
-        <label>User Role</label>
-
-        <select id="role-${esc(user.id)}">
-          <option value="user" ${user.role === 'user' ? 'selected' : ''}>
-            User
-          </option>
-
-          <option value="author" ${user.role === 'author' ? 'selected' : ''}>
-            Author
-          </option>
-
-          <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>
-            Editor
-          </option>
-
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>
-            Admin
-          </option>
-        </select>
-
-        <button
-          type="button"
-          data-save-role="${esc(user.id)}">
-          Update Role
-        </button>
-
       </div>
-    `).join('');
+    `;
   }
 
-  // UPDATE USER ROLE
-  async function updateUserRole(userId) {
+  // SUPER ADMIN: CHANGE USER ROLE
+  async function changeUserRole(userId) {
     if (!isSuperAdmin()) {
-      alert('Only Super Admin can update user roles.');
-      return;
-    }
-
-    if (String(userId) === String(state.session.user.id)) {
-      alert('You cannot change your own role here.');
+      alert('Only Super Admin can change user roles.');
       return;
     }
 
@@ -1475,8 +1614,17 @@
 
     const newRole = select.value;
 
-    if (!['user', 'author', 'editor', 'admin'].includes(newRole)) {
+    if (!['user', 'author', 'editor', 'admin', 'super_admin'].includes(newRole)) {
       alert('Invalid role.');
+      return;
+    }
+
+    if (userId === state.session.user.id && newRole !== 'super_admin') {
+      alert('You cannot remove your own Super Admin role here.');
+      return;
+    }
+
+    if (!confirm(`Change this user's role to ${newRole}?`)) {
       return;
     }
 
@@ -1488,20 +1636,96 @@
 
       if (error) throw error;
 
-      alert('User role updated.');
+      alert('User role updated successfully.');
 
-      await loadAllUsers();
+      await loadUsers();
 
     } catch (error) {
       alert('Role update failed: ' + error.message);
     }
   }
 
-  // PAGE ACCESS
+  // SUPER ADMIN: USER DETAILS
+  function openUserDetails(userId) {
+    if (!isSuperAdmin()) return;
+
+    const user = state.allUsers.find(
+      item => String(item.id) === String(userId)
+    );
+
+    if (!user) return;
+
+    showModal(`
+      <div class="user-details-modal">
+
+        <button type="button"
+          class="modal-close"
+          data-close-modal>×</button>
+
+        <h2>User Details</h2>
+
+        ${user.avatar_url ? `
+          <img
+            src="${esc(user.avatar_url)}"
+            alt="User Photo"
+            width="100"
+            height="100"
+            style="border-radius:50%;object-fit:cover"
+          >
+        ` : ''}
+
+        <p><strong>Name:</strong> ${esc(user.full_name || '')}</p>
+
+        <p><strong>Username:</strong> ${esc(user.username || '')}</p>
+
+        <p><strong>Role:</strong> ${esc(user.role || 'user')}</p>
+
+        <p><strong>Mobile:</strong> ${esc(user.phone || 'Not provided')}</p>
+
+        <p><strong>Bio:</strong> ${esc(user.bio || 'Not provided')}</p>
+
+      </div>
+    `);
+      }
+    // HANDLE AUTH STATE
+  async function handleAuthState(session) {
+    state.session = session;
+
+    if (session?.user) {
+      await loadProfile();
+    } else {
+      state.profile = null;
+    }
+
+    renderAuth();
+    setupPageAccess();
+  }
+
+  // DASHBOARD ACCESS
   function setupPageAccess() {
+    const dashboard = $('dashboardContent');
+    const welcome = $('dashboardWelcome');
+    const writerArea = $('writerArea');
     const adminArea = $('adminArea');
     const superAdminArea = $('superAdminArea');
-    const writerArea = $('writerArea');
+
+    const isDashboardPage = !!dashboard;
+
+    if (!isDashboardPage) return;
+
+    if (!isLoggedIn()) {
+      if (welcome) welcome.hidden = false;
+      if (writerArea) writerArea.hidden = true;
+      if (adminArea) adminArea.hidden = true;
+      if (superAdminArea) superAdminArea.hidden = true;
+      return;
+    }
+
+    if (welcome) welcome.hidden = true;
+
+    if (writerArea) {
+      writerArea.hidden = !isWriter();
+    }
 
     if (adminArea) {
       adminArea.hidden = !isAdmin();
@@ -1511,136 +1735,157 @@
       superAdminArea.hidden = !isSuperAdmin();
     }
 
-    if (writerArea) {
-      writerArea.hidden = !isWriter();
-    }
-
-    renderWriteForm();
-
-    if (isAdmin()) {
-      renderAdminCategories();
-    }
-
-    if (isSuperAdmin()) {
-      loadAllUsers();
-    }
-
     if (isWriter()) {
+      renderWriteForm();
       loadUserPosts();
     }
+
+    if (isAdmin()) {
+      setupAdminPanel();
+    }
+  }
+
+  // DASHBOARD INITIALIZATION
+  async function initializeDashboard() {
+    if (!isLoggedIn()) {
+      setupPageAccess();
+      return;
+    }
+
+    setupPageAccess();
   }
 
   // EVENT HANDLERS
   function setupEvents() {
+
+    // Delegated click events
     document.addEventListener('click', async event => {
+
       const target = event.target.closest('button, [data-action]');
 
       if (!target) return;
 
+      if (target.hasAttribute('data-close-modal')) {
+        closeModal();
+        return;
+      }
+
+      if (target.hasAttribute('data-post-id')) {
+        await openPost(target.getAttribute('data-post-id'));
+        return;
+      }
+
+      if (target.hasAttribute('data-like-post')) {
+        await likePost(target.getAttribute('data-like-post'));
+        return;
+      }
+
+      if (target.hasAttribute('data-bookmark-post')) {
+        await bookmarkPost(target.getAttribute('data-bookmark-post'));
+        return;
+      }
+
+      if (target.hasAttribute('data-edit-post')) {
+        editPost(target.getAttribute('data-edit-post'));
+        return;
+      }
+
+      if (target.hasAttribute('data-delete-post')) {
+        await deletePost(target.getAttribute('data-delete-post'));
+        return;
+      }
+
+      if (target.hasAttribute('data-delete-category')) {
+        await deleteCategory(target.getAttribute('data-delete-category'));
+        return;
+      }
+
+      if (target.hasAttribute('data-change-role')) {
+        await changeUserRole(target.getAttribute('data-change-role'));
+        return;
+      }
+
+      if (target.hasAttribute('data-view-user')) {
+        openUserDetails(target.getAttribute('data-view-user'));
+        return;
+      }
+
       if (target.dataset.action === 'login') {
         openAuthModal('login');
+        return;
       }
 
       if (target.dataset.action === 'signup') {
         openAuthModal('signup');
+        return;
       }
 
       if (target.dataset.action === 'logout') {
         await logout();
+        return;
       }
 
       if (target.dataset.action === 'profile') {
         openProfile();
+        return;
       }
 
-      if (target.dataset.closeModal !== undefined) {
+      if (target.dataset.action === 'dashboard') {
+        location.href = 'dashboard.html';
+        return;
+      }
+
+      if (target.dataset.action === 'close-modal') {
         closeModal();
-      }
-
-      if (target.dataset.editPost) {
-        editPost(target.dataset.editPost);
-      }
-
-      if (target.dataset.deletePost) {
-        deletePost(target.dataset.deletePost);
-      }
-
-      if (target.dataset.deleteCategory) {
-        deleteCategory(target.dataset.deleteCategory);
-      }
-
-      if (target.dataset.saveRole) {
-        updateUserRole(target.dataset.saveRole);
-      }
-
-      if (target.dataset.postId) {
-        openPost(target.dataset.postId);
-      }
-
-      if (target.dataset.likePost) {
-        likePost(target.dataset.likePost);
-      }
-
-      if (target.dataset.bookmarkPost) {
-        bookmarkPost(target.dataset.bookmarkPost);
+        return;
       }
     });
 
-    const categoryForm = $('categoryForm');
+    // Category filter
+    $('categoryFilter')?.addEventListener('change', loadPosts);
 
-    if (categoryForm) {
-      categoryForm.addEventListener('submit', event => {
+    // Search
+    $('searchInput')?.addEventListener('input', loadPosts);
+
+    // Article form
+    document.addEventListener('submit', async event => {
+
+      if (event.target.id === 'articleForm') {
         event.preventDefault();
-        addCategory();
-      });
-    }
+        await submitPost();
+        return;
+      }
 
-    const writeForm = $('writeForm');
-
-    if (writeForm) {
-      writeForm.addEventListener('submit', event => {
+      if (event.target.id === 'categoryForm') {
         event.preventDefault();
-        submitPost();
-      });
-    }
+        await addCategory();
+        return;
+      }
 
-    const searchInput = $('searchInput');
+      if (event.target.id === 'settingsForm') {
+        event.preventDefault();
+        await saveSettings();
+      }
+    });
 
-    if (searchInput) {
-      let searchTimeout;
-
-      searchInput.addEventListener('input', () => {
-        clearTimeout(searchTimeout);
-
-        searchTimeout = setTimeout(() => {
-          loadPosts();
-        }, 350);
-      });
-    }
-
-    const categoryFilter = $('categoryFilter');
-
-    if (categoryFilter) {
-      categoryFilter.addEventListener('change', loadPosts);
-    }
-             }
-    // AUTH STATE
-  async function handleAuthState(session) {
-    state.session = session;
-
-    if (session?.user) {
-      await loadProfile();
-    } else {
-      state.profile = null;
-      state.userPosts = [];
-      state.allUsers = [];
-    }
-
-    renderAuth();
-    setupPageAccess();
+    // Dashboard welcome sign in
+    $('dashboardWelcome')?.querySelector('button')?.addEventListener(
+      'click',
+      () => openAuthModal('login')
+    );
   }
 
-  // INITIALIZE APPLICATION
+  // CLOSE MODAL
+  function closeModal() {
+    const modal = $('modal');
+
+    if (!modal) return;
+
+    modal.innerHTML = '';
+    modal.hidden = true;
+  }
+
+  // INITIALIZATION
   async function init() {
     if (state.initialized) return;
 
@@ -1648,14 +1893,8 @@
 
     setupEvents();
 
-    // Show login/signup buttons immediately
-    renderAuth();
-
-    const connected = await initializeSupabase();
-
-    if (!connected || !state.db) {
-      setStatus('Supabase connection is not configured. Check config.js.');
-      console.error('Please verify SUPABASE_URL and SUPABASE_ANON_KEY.');
+    if (!initializeSupabase()) {
+      setStatus('Configuration missing.');
       return;
     }
 
@@ -1664,42 +1903,54 @@
 
       if (error) throw error;
 
-      await handleAuthState(data.session);
+      state.session = data.session;
 
-      state.db.auth.onAuthStateChange((_event, session) => {
-        setTimeout(() => {
-          handleAuthState(session).catch(error => {
-            console.error('Authentication state error:', error);
-          });
-        }, 0);
-      });
+      if (state.session?.user) {
+        await loadProfile();
+      }
 
-      await Promise.all([
-        loadSettings(),
-        loadCategories(),
-        loadPosts()
-      ]);
+      renderAuth();
+
+      await loadSettings();
+      await loadCategories();
+      await loadPosts();
 
       setupPageAccess();
 
-      const year = $('year');
-
-      if (year) {
-        year.textContent = new Date().getFullYear();
+      if ($('dashboardContent')) {
+        await initializeDashboard();
       }
 
-      setStatus('');
-
-      console.log('RK BlogSphere initialized successfully.');
-
     } catch (error) {
-      console.error('Application initialization error:', error);
+      console.error('Initialization error:', error);
+      setStatus('Website initialization failed.');
+    }
 
-      setStatus('Unable to initialize application: ' + error.message);
+    state.db.auth.onAuthStateChange(async (event, session) => {
+      state.session = session;
+
+      if (session?.user) {
+        await loadProfile();
+      } else {
+        state.profile = null;
+      }
+
+      renderAuth();
+      setupPageAccess();
+
+      if (state.db) {
+        await loadPosts();
+      }
+    });
+
+    const year = $('year');
+
+    if (year) {
+      year.textContent = new Date().getFullYear();
     }
   }
 
-  // GLOBAL FUNCTIONS FOR HTML BUTTONS
+  // PUBLIC API
   window.BLOGSPHERE = {
     openLogin: () => openAuthModal('login'),
     openSignup: () => openAuthModal('signup'),
@@ -1707,18 +1958,16 @@
     logout,
     closeModal,
     loadPosts,
-    loadCategories,
-    loadAllUsers,
-    addCategory,
-    deleteCategory,
-    submitPost
+    openPost,
+    init
   };
 
-  // START APPLICATION
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  // START WEBSITE
+  document.addEventListener('DOMContentLoaded', init);
+
+  if (document.readyState !== 'loading') {
     init();
   }
 
 })();
+  
