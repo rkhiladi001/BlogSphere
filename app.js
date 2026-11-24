@@ -65,24 +65,20 @@
   // MODAL
   function showModal(content) {
     const modal = $('modal');
-    if (!modal) return;
+    const modalContent = $('modalContent');
+    if (!modal || !modalContent) return;
 
-    modal.innerHTML = `
-      <div class="modal-overlay">
-        <div class="modal-content">
-          <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
-          ${content}
-        </div>
-      </div>
-    `;
+    // Keep the original modal HTML from index.html/dashboard.html/write.html.
+    modalContent.innerHTML = content;
     modal.hidden = false;
     modal.style.display = 'flex';
   }
 
   function closeModal() {
     const modal = $('modal');
-    if (!modal) return;
-    modal.innerHTML = '';
+    const modalContent = $('modalContent');
+    if (!modal || !modalContent) return;
+    modalContent.innerHTML = '';
     modal.hidden = true;
     modal.style.display = 'none';
   }
@@ -199,12 +195,6 @@
 
     showModal(`
       <div class="auth-modal">
-
-        <button type="button"
-          data-close-modal
-          class="modal-close">
-          ×
-        </button>
 
         <h2>${signup ? 'Create Account' : 'Welcome Back'}</h2>
 
@@ -375,10 +365,6 @@
 
     showModal(`
       <div class="profile-modal">
-
-        <button type="button"
-          data-close-modal
-          class="modal-close">×</button>
 
         <h2>My Profile</h2>
 
@@ -819,10 +805,6 @@
       showModal(`
         <article class="single-post">
 
-          <button type="button"
-            data-close-modal
-            class="modal-close">×</button>
-
           ${(post.cover_image || post.image_url) ? `
             <img
               src="${esc(post.cover_image || post.image_url)}"
@@ -882,8 +864,9 @@
     } catch (error) {
       alert('Unable to open article: ' + error.message);
     }
-                                    }
-    // LOAD COMMENTS
+  }
+
+  // LOAD COMMENTS
   async function loadComments(postId) {
     const host = $('commentsArea');
     if (!host || !state.db) return;
@@ -898,25 +881,8 @@
       if (error) throw error;
 
       if (!data?.length) {
-        host.innerHTML = '<p>No comments yet.</p>';
-        return;
-      }
-
-      host.innerHTML = data.map(comment => `
-        <div class="comment-item">
-          <strong>${esc(comment.author_name || 'User')}</strong>
-          <p>${esc(comment.content || comment.comment || '')}</p>
-          <small>${formatDate(comment.created_at)}</small>
-        </div>
-      `).join('');
-
-    } catch (error) {
-      host.textContent = 'Unable to load comments: ' + error.message;
-    }
-  }
-
-  // ADD COMMENT
-  async function addComment(postId) {
+        host.innerHTML = '<p>No co
+            async function addComment(postId) {
     if (!isLoggedIn()) {
       alert('Please sign in first.');
       return;
@@ -1037,23 +1003,57 @@
     return data.publicUrl;
   }
 
-  // WRITE FORM ACCESS
+  // WRITE FORM ACCESS - supports dashboard and standalone write.html
   function renderWriteForm() {
     const prompt = $('writePrompt');
-    const form = $('writeForm');
+    let form = $('writeForm') || $('postForm');
+
+    // Dashboard contains an empty #writeForm host; build the same fields
+    // used by write.html so both pages share submit/edit logic.
+    if (form && form.id === 'writeForm' && !form.querySelector('#postTitle')) {
+      form.innerHTML = `
+        <form id="dashboardPostForm" class="post-editor-form">
+          <label for="postTitle">Article Title</label>
+          <input id="postTitle" type="text" placeholder="Article title" required>
+          <label for="postExcerpt">Short Description</label>
+          <input id="postExcerpt" type="text" placeholder="Short description">
+          <label for="postCategory">Category</label>
+          <select id="postCategory"><option value="">Choose category</option></select>
+          <label for="postContent">Article Content</label>
+          <textarea id="postContent" rows="12" placeholder="Write your article here..." required></textarea>
+          <label for="postImage">Cover Image (optional)</label>
+          <input id="postImage" type="file" accept="image/*">
+          <label for="postStatus">Article Status</label>
+          <select id="postStatus"><option value="draft">Draft</option><option value="pending">Pending Review</option></select>
+          <button class="btn" type="submit">Submit Article</button>
+        </form>
+      `;
+      form = $('dashboardPostForm');
+    }
+
+    form = $('dashboardPostForm') || $('writeForm') || $('postForm');
 
     if (!isWriter()) {
       if (prompt) {
         prompt.hidden = false;
         prompt.textContent = 'Please sign in with an Author account to write articles.';
       }
-
       if (form) form.hidden = true;
       return;
     }
 
     if (prompt) prompt.hidden = true;
     if (form) form.hidden = false;
+
+    // Keep category options current after asynchronous category loading.
+    const category = $('postCategory');
+    if (category && state.categories.length) {
+      const selected = category.value;
+      category.innerHTML = `<option value="">Choose category</option>${state.categories.map(item =>
+        `<option value="${esc(item.id)}">${esc(item.name)}</option>`
+      ).join('')}`;
+      category.value = selected;
+    }
   }
 
   // SUBMIT OR UPDATE POST
@@ -1063,14 +1063,14 @@
       return;
     }
 
-    const form = $('writeForm');
+    const form = $('dashboardPostForm') || $('writeForm') || $('postForm');
 
     const title = $('postTitle')?.value.trim();
     const excerpt = $('postExcerpt')?.value.trim();
     const content = $('postContent')?.value.trim();
     const categoryId = $('postCategory')?.value || null;
     const status = $('postStatus')?.value || 'draft';
-    const coverFile = $('postImage')?.files?.[0];
+    const coverFile = $('postImage')?.files?.[0] || $('coverFile')?.files?.[0];
 
     if (!title || !content) {
       alert('Please enter post title and content.');
@@ -1217,7 +1217,7 @@
 
     if (!isWriter()) return;
 
-    const form = $('writeForm');
+    const form = $('dashboardPostForm') || $('writeForm') || $('postForm');
 
     if (!form) {
       alert('Write form not found.');
@@ -1355,8 +1355,9 @@
 
       </div>
     `).join('');
-      }
-    // LOAD ALL USERS - SUPER ADMIN ONLY
+  }
+
+  // LOAD ALL USERS - SUPER ADMIN ONLY
   async function loadAllUsers() {
     if (!isSuperAdmin() || !state.db) return;
 
@@ -1504,6 +1505,11 @@
     const adminArea = $('adminArea');
     const superAdminArea = $('superAdminArea');
     const writerArea = $('writerArea');
+    const dashboardWelcome = $('dashboardWelcome');
+
+    if (dashboardWelcome) {
+      dashboardWelcome.hidden = isLoggedIn();
+    }
 
     if (adminArea) {
       adminArea.hidden = !isAdmin();
@@ -1536,7 +1542,7 @@
   function setupEvents() {
     document.addEventListener('click', async event => {
 
-      if (event.target.classList?.contains('modal-overlay')) {
+      if (event.target === $('modal')) {
         closeModal();
         return;
       }
@@ -1546,12 +1552,6 @@
 
       if (target.hasAttribute('data-close-modal')) {
         closeModal();
-        return;
-      }
-
-      // Dashboard login button
-      if (target.closest('#dashboardWelcome')) {
-        openAuthModal('login');
         return;
       }
 
@@ -1621,15 +1621,17 @@
       });
     }
 
-    // WRITE FORM
-    const writeForm = $('writeForm');
-
-    if (writeForm) {
-      writeForm.addEventListener('submit', event => {
+    // WRITE FORMS - dashboard and standalone write.html
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (['writeForm', 'postForm', 'dashboardPostForm'].includes(form.id)) {
         event.preventDefault();
         submitPost(event);
-      });
-    }
+      }
+    });
+
+    // The single close button belongs to the original modal shell.
+    $('closeModal')?.addEventListener('click', closeModal);
 
     // SEARCH
     const searchInput = $('searchInput');
@@ -1741,14 +1743,4 @@
     loadAllUsers,
     addCategory,
     deleteCategory,
-    submitPost
-  };
-
-  // START APPLICATION
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-})();
+    
