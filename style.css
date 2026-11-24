@@ -1199,4 +1199,165 @@ footer a {
     max-width: 100%;
   }
   }
+/* =========================================
+   RK BLOGSPHERE - CLASSIC ARTICLE CARD DESIGN
+========================================= */
 
+#posts {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px !important;
+  padding: 15px 0 35px;
+}
+
+.post-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #ffffff, #fffaf3);
+  border: 1px solid #e8d9ff;
+  border-radius: 24px !important;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(42, 31, 92, 0.10);
+  transition: all .35s ease;
+}
+
+.post-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 45px rgba(42, 31, 92, 0.20);
+  border-color: #c4b5fd;
+}
+
+.post-cover {
+  width: 100% !important;
+  height: 245px !important;
+  object-fit: cover !important;
+  display: block;
+  background: linear-gradient(135deg, #ddd6fe, #bfdbfe);
+}
+
+.post-card-content {
+  padding: 23px !important;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.post-category {
+  display: inline-flex !important;
+  align-self: flex-start;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e !important;
+  border: 1px solid #fcd34d;
+  border-radius: 30px;
+  padding: 7px 14px !important;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin-bottom: 14px;
+}
+
+.post-card-content h2 {
+  font-size: 25px !important;
+  line-height: 1.45 !important;
+  color: #172554 !important;
+  margin: 8px 0 14px !important;
+  font-weight: 800;
+}
+
+.post-card-content > p {
+  color: #526078 !important;
+  font-size: 15px;
+  line-height: 1.8 !important;
+  margin-bottom: 18px;
+}
+
+.post-meta {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: #64748b !important;
+  font-size: 13px !important;
+  border-top: 1px solid #eee5ff;
+  border-bottom: 1px solid #eee5ff;
+  padding: 13px 0;
+  margin: auto 0 18px !important;
+}
+
+.post-card-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 10px !important;
+  margin-top: 12px !important;
+}
+
+.post-card-actions button {
+  flex: 1 1 auto;
+  min-width: 100px;
+  padding: 12px 14px !important;
+  border: none;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #6d28d9, #2563eb) !important;
+  color: white !important;
+  font-weight: 800;
+  transition: all .25s ease;
+}
+
+.post-card-actions button:hover {
+  background: linear-gradient(135deg, #433078, #1d4ed8) !important;
+  transform: translateY(-2px);
+}
+
+.post-card-actions button[data-like-post] {
+  background: linear-gradient(135deg, #e11d48, #ec4899) !important;
+}
+
+.post-card-actions button[data-bookmark-post] {
+  background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+}
+
+/* Empty article area */
+
+#posts .empty {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #f5f3ff, #eff6ff);
+  border: 1px dashed #a78bfa;
+  border-radius: 22px;
+  padding: 35px;
+  text-align: center;
+}
+
+/* MOBILE CARD DESIGN */
+
+@media (max-width: 600px) {
+
+  #posts {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+
+  .post-card {
+    border-radius: 20px !important;
+  }
+
+  .post-cover {
+    height: 220px !important;
+  }
+
+  .post-card-content {
+    padding: 19px !important;
+  }
+
+  .post-card-content h2 {
+    font-size: 23px !important;
+  }
+
+  .post-card-actions {
+    flex-direction: row !important;
+  }
+
+  .post-card-actions button {
+    min-width: 0;
+  }
+}
