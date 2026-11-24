@@ -1,17 +1,18 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>RK BlogSphere</title>
+
 <meta name="description" content="RK BlogSphere - Read informative articles, trending topics, technology, education, news and helpful blogs.">
 <meta name="keywords" content="RK BlogSphere, blogs, education, technology, news, articles, trending topics">
 <meta name="author" content="RK BlogSphere">
-<meta name="theme-color" content="#111827">
+<meta name="theme-color" content="#172554">
 
-<meta name="google-site-verification" content="bBL84guGnt4KX02H6-aLKyRtq_pavFa4VCO5gLa5WHE" />
+<meta name="google-site-verification" content="bBL84guGnt4KX02H6-aLKyRtq_pavFa4VCO5gLa5WHE">
 
 <meta property="og:title" content="RK BlogSphere">
 <meta property="og:description" content="Explore informative blogs, trending topics, education, technology and more on RK BlogSphere.">
@@ -29,6 +30,7 @@
 <link rel="stylesheet" href="style.css">
 
 <style>
+
 .rkb-logo-image{
 display:block;
 object-fit:contain;
@@ -94,9 +96,107 @@ gap:10px;
 margin:25px 0;
 }
 
-.page-links a{
-text-decoration:none;
+/* NEWSLETTER SECTION */
+
+.newsletter-section{
+margin:45px 0;
+padding:40px 25px;
+border-radius:26px;
+background:linear-gradient(
+135deg,
+#172554,
+#433078,
+#6d28d9,
+#2563eb
+);
+color:white;
+text-align:center;
+box-shadow:0 15px 35px rgba(39,39,90,.2);
+overflow:hidden;
 }
+
+.newsletter-section h2{
+color:white;
+font-size:32px;
+margin-bottom:15px;
+}
+
+.newsletter-section p{
+color:#f3f4ff;
+max-width:650px;
+margin:12px auto;
+line-height:1.8;
+}
+
+.newsletter-decoration{
+font-size:40px;
+margin-bottom:15px;
+}
+
+.newsletter-form{
+display:flex;
+flex-wrap:wrap;
+justify-content:center;
+gap:12px;
+max-width:600px;
+margin:25px auto 0;
+}
+
+.newsletter-form input{
+flex:1 1 240px;
+min-width:0;
+padding:15px;
+border-radius:12px;
+border:2px solid transparent;
+background:white;
+color:#172554;
+}
+
+.newsletter-form button{
+background:linear-gradient(135deg,#f59e0b,#fbbf24);
+color:#172554;
+padding:15px 25px;
+border-radius:12px;
+font-weight:bold;
+}
+
+.newsletter-form button:hover{
+background:#fde68a;
+}
+
+.newsletter-message{
+min-height:24px;
+font-weight:bold;
+margin-top:15px;
+}
+
+.newsletter-note{
+font-size:13px;
+opacity:.85;
+}
+
+@media(max-width:600px){
+
+.newsletter-section{
+padding:28px 18px;
+}
+
+.newsletter-section h2{
+font-size:26px;
+}
+
+.newsletter-form{
+flex-direction:column;
+}
+
+.newsletter-form input,
+.newsletter-form button{
+width:100%;
+box-sizing:border-box;
+}
+
+}
+
 </style>
 </head>
 
@@ -133,6 +233,8 @@ RK <span>BlogSphere</span>
 </header>
 
 <main>
+
+<!-- HERO -->
 
 <section class="hero" id="home">
 
@@ -188,39 +290,124 @@ Grow.
 
 </section>
 
+<!-- QUICK LINKS -->
+
 <div class="page-links">
-<a class="btn secondary" href="write.html">Write an Article</a>
-<a class="btn secondary" href="dashboard.html">Dashboard</a>
-<a class="btn secondary" href="about.html">About Us</a>
-<a class="btn secondary" href="contact.html">Contact Us</a>
+
+<a class="btn secondary" href="write.html">
+Write an Article
+</a>
+
+<a class="btn secondary" href="dashboard.html">
+Dashboard
+</a>
+
+<a class="btn secondary" href="about.html">
+About Us
+</a>
+
+<a class="btn secondary" href="contact.html">
+Contact Us
+</a>
+
 </div>
+
+<!-- ARTICLE SEARCH -->
 
 <section class="toolbar" id="feed">
 
-<input id="search" placeholder="Search articles…">
+<input
+id="searchInput"
+placeholder="Search articles…"
+type="search">
 
 <select id="categoryFilter">
 <option value="">All categories</option>
 </select>
 
-<button id="refreshBtn" class="btn secondary" type="button">
+<button
+id="refreshBtn"
+class="btn secondary"
+type="button">
 Refresh
 </button>
 
 </section>
 
+<!-- ARTICLE FEED -->
+
 <section>
 
 <div class="sectionhead">
+
 <h2>Latest stories</h2>
-<span id="feedStatus">Loading…</span>
+
+<span id="feedStatus">
+Loading…
+</span>
+
 </div>
 
 <div id="posts" class="posts"></div>
 
 </section>
 
+<!-- NEWSLETTER / SUBSCRIBE -->
+
+<section
+class="newsletter-section"
+id="newsletter">
+
+<div class="newsletter-decoration">
+✉ ✨
+</div>
+
+<h2>
+Join the RK BlogSphere Community
+</h2>
+
+<p>
+Subscribe to our newsletter and discover
+interesting stories, fresh ideas, helpful articles
+and new updates from RK BlogSphere.
+</p>
+
+<form
+id="newsletterForm"
+class="newsletter-form">
+
+<input
+type="email"
+id="newsletterEmail"
+name="email"
+placeholder="Enter your email address"
+aria-label="Email address"
+autocomplete="email"
+required>
+
+<button
+type="submit"
+id="newsletterButton">
+Subscribe Now ✨
+</button>
+
+</form>
+
+<div
+id="newsletterMessage"
+class="newsletter-message"
+aria-live="polite">
+</div>
+
+<p class="newsletter-note">
+Stay connected with stories and ideas.
+</p>
+
+</section>
+
 </main>
+
+<!-- FOOTER -->
 
 <footer>
 
@@ -235,7 +422,8 @@ onerror="this.style.display='none'">
 </div>
 
 <p>
-© <span id="year"></span> RK BlogSphere · Made for readers and writers
+© <span id="year"></span>
+RK BlogSphere · Made for readers and writers
 </p>
 
 <p>
@@ -247,11 +435,18 @@ onerror="this.style.display='none'">
 
 </footer>
 
+<!-- MODAL -->
+
 <div id="modal" class="modal" hidden>
 
 <div class="modalcard">
 
-<button id="closeModal" class="close" type="button">×</button>
+<button
+id="closeModal"
+class="close"
+type="button">
+×
+</button>
 
 <div class="rkb-logo-frame">
 
@@ -268,13 +463,23 @@ onerror="this.style.display='none'">
 </div>
 
 </div>
+
+<!-- SCRIPTS -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script src="config.js"></script>
+
 <script src="app.js"></script>
+
 <script src="newsletter.js"></script>
+
 <script src="scroll-top.js"></script>
+
 <script src="theme-toggle.js"></script>
+
 <script src="reading-progress.js"></script>
+
 <script src="social-share.js"></script>
 
 </body>
