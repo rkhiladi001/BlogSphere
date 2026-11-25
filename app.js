@@ -62,25 +62,64 @@
     if (element) element.textContent = text || '';
   }
 
-  // MODAL
-  function showModal(content) {
-    const modal = $('modal');
-    const modalContent = $('modalContent');
-    if (!modal || !modalContent) return;
+  // MODAL - retain the page's original modal shell and create a safe fallback if needed.
+  function getModalElements() {
+    let modal = $('modal');
 
-    // Keep the original modal HTML from index.html/dashboard.html/write.html.
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modal';
+      modal.className = 'modal';
+      modal.hidden = true;
+      document.body.appendChild(modal);
+    }
+
+    let modalContent = $('modalContent');
+
+    if (!modalContent) {
+      let card = modal.querySelector('.modalcard');
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'modalcard';
+        modal.appendChild(card);
+      }
+
+      let closeButton = $('closeModal');
+      if (!closeButton) {
+        closeButton = document.createElement('button');
+        closeButton.id = 'closeModal';
+        closeButton.type = 'button';
+        closeButton.className = 'close';
+        closeButton.setAttribute('aria-label', 'Close');
+        closeButton.textContent = '×';
+        card.appendChild(closeButton);
+        closeButton.addEventListener('click', closeModal);
+      }
+
+      modalContent = document.createElement('div');
+      modalContent.id = 'modalContent';
+      card.appendChild(modalContent);
+    }
+
+    return { modal, modalContent };
+  }
+
+  function showModal(content) {
+    const { modal, modalContent } = getModalElements();
     modalContent.innerHTML = content;
     modal.hidden = false;
     modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
   }
 
   function closeModal() {
     const modal = $('modal');
     const modalContent = $('modalContent');
-    if (!modal || !modalContent) return;
-    modalContent.innerHTML = '';
+    if (!modal) return;
+    if (modalContent) modalContent.innerHTML = '';
     modal.hidden = true;
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
   }
 
   // DATE FORMAT
@@ -115,6 +154,8 @@
 
   // SUPABASE INITIALIZATION
   function initializeSupabase() {
+    if (state.db) return true;
+
     try {
       if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
         throw new Error('Supabase URL or Anon Key is missing in config.js.');
@@ -142,27 +183,50 @@
     }
   }
 
-  // AUTH BUTTONS
+  // AUTH BUTTONS - render reliably even if a page omitted #authArea.
   function renderAuth() {
-    const area = $('authArea');
-    if (!area) return;
+    let area = $('authArea') || document.querySelector('[data-auth-area]');
+
+    if (!area) {
+      const header = document.querySelector('.topbar nav') ||
+        document.querySelector('header nav') ||
+        document.querySelector('.topbar') ||
+        document.querySelector('header');
+
+      if (!header) {
+        console.warn('RK BlogSphere: #authArea was not found and no header fallback exists.');
+        return;
+      }
+
+      area = document.createElement('div');
+      area.id = 'authArea';
+      area.className = 'auth-area';
+      header.appendChild(area);
+    }
+
+    area.hidden = false;
+    area.removeAttribute('hidden');
+    area.classList.add('auth-area');
+    area.style.setProperty('display', 'flex', 'important');
+    area.style.setProperty('visibility', 'visible', 'important');
+    area.style.setProperty('opacity', '1', 'important');
+    area.style.alignItems = 'center';
+    area.style.gap = '8px';
 
     if (!isLoggedIn()) {
       area.innerHTML = `
-        <button type="button" data-action="login">
+        <button class="btn auth-btn" type="button" data-action="login">
           Sign In
         </button>
-
-        <button type="button" data-action="signup">
+        <button class="btn auth-btn" type="button" data-action="signup">
           Sign Up
         </button>
       `;
-
       return;
     }
 
     area.innerHTML = `
-      <div class="auth-user">
+      <div class="auth-user" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <img
           src="${getAvatar()}"
           alt="Profile"
@@ -170,31 +234,29 @@
           height="36"
           style="border-radius:50%;object-fit:cover"
         >
-
         <span>${esc(getUserName())}</span>
-
-        <button type="button" data-action="profile">
-          My Profile
-        </button>
-
-        <button type="button" data-action="logout">
-          Logout
-        </button>
+        <button class="btn auth-btn" type="button" data-action="profile">My Profile</button>
+        <button class="btn auth-btn" type="button" data-action="logout">Logout</button>
       </div>
     `;
   }
 
   // AUTH MODAL
   function openAuthModal(mode = 'login') {
+    // The Dashboard button can be clicked before init() finishes; initialize here too.
+    if (!state.db) initializeSupabase();
+
     if (!state.db) {
-      alert('Supabase connection is not ready. Please check config.js.');
+      alert('Supabase connection is not ready. Please check config.js and ensure supabase-js and config.js load before app.js.');
       return;
     }
 
     const signup = mode === 'signup';
+    const existingAuth = $('modalContent')?.querySelector('.auth-modal');
+    if (existingAuth?.dataset.mode === mode && !$('modal')?.hidden) return;
 
     showModal(`
-      <div class="auth-modal">
+      <div class="auth-modal" data-mode="${signup ? 'signup' : 'login'}">
 
         <h2>${signup ? 'Create Account' : 'Welcome Back'}</h2>
 
@@ -555,8 +617,7 @@
   // LOAD WEBSITE SETTINGS
   async function loadSettings() {
     if (!state.db) return;
-
-    try {
+        try {
       const { data, error } = await state.db
         .from('site_settings')
         .select('key,value');
@@ -682,7 +743,8 @@
       let query = state.db
         .from('posts')
         .select('*')
-        .eq('status', 'published')
+        // Case-insensitive exact match: keeps drafts/private posts excluded.
+        .ilike('status', 'published')
         .order('created_at', { ascending: false });
 
       const search = $('searchInput')?.value.trim();
@@ -864,9 +926,8 @@
     } catch (error) {
       alert('Unable to open article: ' + error.message);
     }
-  }
-
-  // LOAD COMMENTS
+                                    }
+    // LOAD COMMENTS
   async function loadComments(postId) {
     const host = $('commentsArea');
     if (!host || !state.db) return;
@@ -881,8 +942,25 @@
       if (error) throw error;
 
       if (!data?.length) {
-        host.innerHTML = '<p>No co
-            async function addComment(postId) {
+        host.innerHTML = '<p>No comments yet.</p>';
+        return;
+      }
+
+      host.innerHTML = data.map(comment => `
+        <div class="comment-item">
+          <strong>${esc(comment.author_name || 'User')}</strong>
+          <p>${esc(comment.content || comment.comment || '')}</p>
+          <small>${formatDate(comment.created_at)}</small>
+        </div>
+      `).join('');
+
+    } catch (error) {
+      host.textContent = 'Unable to load comments: ' + error.message;
+    }
+  }
+
+  // ADD COMMENT
+  async function addComment(postId) {
     if (!isLoggedIn()) {
       alert('Please sign in first.');
       return;
@@ -1166,9 +1244,8 @@
     } catch (error) {
       console.error('User posts error:', error);
     }
-  }
-
-  // RENDER USER POSTS
+        }
+    // RENDER USER POSTS
   function renderUserPosts() {
     const host = $('myPosts');
     if (!host) return;
@@ -1355,9 +1432,8 @@
 
       </div>
     `).join('');
-  }
-
-  // LOAD ALL USERS - SUPER ADMIN ONLY
+      }
+    // LOAD ALL USERS - SUPER ADMIN ONLY
   async function loadAllUsers() {
     if (!isSuperAdmin() || !state.db) return;
 
@@ -1540,6 +1616,14 @@
 
   // EVENT HANDLERS
   function setupEvents() {
+    // Convert the legacy inline Dashboard button to the same delegated action.
+    // This avoids depending on inline JavaScript and prevents a double click handler.
+    const dashboardLoginButton = $('dashboardWelcome')?.querySelector('button');
+    if (dashboardLoginButton) {
+      dashboardLoginButton.removeAttribute('onclick');
+      dashboardLoginButton.dataset.action = 'login';
+    }
+
     document.addEventListener('click', async event => {
 
       if (event.target === $('modal')) {
@@ -1549,6 +1633,11 @@
 
       const target = event.target.closest('button, [data-action]');
       if (!target) return;
+
+      if (target.closest('#dashboardWelcome')) {
+        openAuthModal('login');
+        return;
+      }
 
       if (target.hasAttribute('data-close-modal')) {
         closeModal();
@@ -1630,7 +1719,7 @@
       }
     });
 
-    // The single close button belongs to the original modal shell.
+    // The close button is handled once by the modal shell.
     $('closeModal')?.addEventListener('click', closeModal);
 
     // SEARCH
@@ -1686,6 +1775,8 @@
     const connected = await initializeSupabase();
 
     if (!connected || !state.db) {
+      // Keep Sign In / Sign Up visible even when the database connection fails.
+      renderAuth();
       setStatus('Supabase connection is not configured. Check config.js.');
       console.error('Please verify SUPABASE_URL and SUPABASE_ANON_KEY.');
       return;
@@ -1743,4 +1834,14 @@
     loadAllUsers,
     addCategory,
     deleteCategory,
-    
+    submitPost
+  };
+
+  // START APPLICATION
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
